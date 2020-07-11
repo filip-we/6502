@@ -111,5 +111,4 @@ class Filipro(object):
 
     def write_read(self, cmd, data=bytearray()):
         self.write(cmd, data)
-        sleep(0.5)
         return self.read()
