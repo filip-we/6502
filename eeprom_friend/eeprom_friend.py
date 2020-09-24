@@ -7,7 +7,7 @@ WRITE_EEPROM_ADDRESS = 7
 class EepromFriend(object):
     def __init__(self, interface='/dev/ttyUSB0',
                     baudrate=19200,
-                    timeout=1,
+                    timeout=3,
                     size_in_kbit=256):
         self.conn = Filipro(interface, baudrate, timeout)
         self.size = size_in_kbit * 1024
