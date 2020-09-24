@@ -22,7 +22,6 @@ class EepromFriend(object):
         with self.conn as c:
             temp = (start << 16) + end
             temp = temp.to_bytes(4, byteorder='big')
-            print(f'Sending data: {temp}')
             c.write_read(READ_EEPROM, temp)
             for address in range(start, end, 16):
                 d = c.write_read(CONTINUE)[1]
@@ -32,7 +31,7 @@ class EepromFriend(object):
                             ''.join([' {:02x}'.format(x) for x in d]))
             cmd = c.write_read(ABORT)[0]
             if not cmd == ABORT:
-                print('Not aborted properly')
+                self.logger.error('Not aborted properly')
         return data
 
     def write_eeprom(self, data, start=0):

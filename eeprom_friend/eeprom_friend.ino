@@ -1,37 +1,28 @@
 #include <Filipro.h>
-const int SHIFT_DATA = 2;
-const int SHIFT_LATCH = 3;//RCLK, chip pin 12
-const int SHIFT_CLOCK = 4;//SRCLK, chip pin 11
+const int SHIFT_DATA = A5;
+const int SHIFT_LATCH = A4;//RCLK, chip pin 12
+const int SHIFT_CLOCK = A3;//SRCLK, chip pin 11
 
-const int WRITE_ENABLE = 5;
-const int EEPROM_START = 6;
-const int EEPROM_END = 13;
+const int WRITE_ENABLE = A2;
+const int EEPROM_START = 2;
+const int EEPROM_END = 9;
 const int baudrate = 19200;//28800;
 
 const byte ABORT_CMD = 0x00;
 const byte CONTINUE_CMD = 0x01;
 const byte READ_EEPROM_CMD = 0x05;
 const byte WRITE_EEPROM_CMD = 0x06;
-const byte SPECIAL = 0x07;
+const byte WRITE_EEPROM_ADDRESS = 0x07;
 Filipro fp = Filipro();
 byte cmd;
 byte data[255];
 byte dataLen;
 
-void setIOPinsOutput()
+void setIOPins(int mode)
 {
   for (int i = EEPROM_START; i <= EEPROM_END; i++)
   {
-    pinMode(i, OUTPUT);
-  }
-  delay(10);
-}
-
-void setIOPinsInput()
-{
-  for (int i = EEPROM_START; i <= EEPROM_END; i++)
-  {
-    pinMode(i, INPUT);
+    pinMode(i, mode);
   }
   delay(10);
 }
@@ -69,7 +60,7 @@ void writeEepromAddress(int address, byte data)
 
 void writeEeprom()
 {
-  setIOPinsOutput();
+  setIOPins(OUTPUT);
   int startAddress = (unsigned int) (data[0] << 0x08) + data[1];
   int stopAddress = (unsigned int) (data[2] << 0x08) + data[3];  
   fp.write(WRITE_EEPROM_CMD, data, 4);
@@ -91,12 +82,12 @@ void writeEeprom()
 
 void writeEepromAddressCmd()
 {
-  setIOPinsOutput();
-  fp.write(SPECIAL, data, 0);
+  setIOPins(OUTPUT);
+  fp.write(WRITE_EEPROM_ADDRESS, data, 0);
   unsigned int address = (unsigned int) ((data[0] << 0x08) + data[1]);
   writeEepromAddress(address, data[2]);
   byte sendData[1];
-  setIOPinsInput();
+  setIOPins(INPUT);
   sendData[0] = readEepromAddress(address);
   fp.readWrite(&cmd, &data[0], &dataLen,
       ABORT_CMD, sendData, 1);
@@ -104,22 +95,25 @@ void writeEepromAddressCmd()
 
 void readEeprom()
 {
-  setIOPinsInput();
+  setIOPins(INPUT);
   int startAddress = (unsigned int) (data[0] << 0x08) + data[1];
   int stopAddress = (unsigned int) (data[2] << 0x08) + data[3];
   byte sendData[16];
-  fp.write(READ_EEPROM_CMD, data, 4);
+  fp.readWrite(&cmd, &data[0], &dataLen, READ_EEPROM_CMD, data, 4);
   for (int i = startAddress; i <= stopAddress; i = i + 16)
   {
+    fp.read(&cmd, &data[0], &dataLen);
+    if (cmd == ABORT_CMD)
+    {
+      fp.write(ABORT_CMD, data, 0);
+      break;
+    }
+    else
+    {
       for (int address = i; address < (i + 16); address++){
         sendData[address - i] = readEepromAddress(address);
       }
-    cmd = ABORT_CMD;
-    fp.readWrite(&cmd, &data[0], &dataLen, READ_EEPROM_CMD, sendData, 16);
-    if (cmd == ABORT_CMD)
-    {
-      fp.readWrite(&cmd, &data[0], &dataLen, ABORT_CMD, sendData, 0);
-      break;
+      fp.write(CONTINUE, sendData, 16);
     }
   }
 }
@@ -148,7 +142,7 @@ void setup()
 void loop() {
   while(Serial.available() < 1);
   fp.read(&cmd, &data[0], &dataLen);
-
+  
   switch (cmd) {
   case READ_EEPROM_CMD:
     readEeprom();
@@ -156,11 +150,11 @@ void loop() {
   case WRITE_EEPROM_CMD:
     writeEeprom();
     break;
-  case SPECIAL:
+  case WRITE_EEPROM_ADDRESS:
     writeEepromAddressCmd();
     break;
   default:
-    fp.write(cmd, data, dataLen);
+    fp.write(ABORT, data, dataLen);
     break;
   }
 }
