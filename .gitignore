@@ -1,4 +1,6 @@
 *.swp
+a.out
 /__pycache__
 /eeprom/eeprom_friend/__pycache__
+/cpu_code/compiler
 
