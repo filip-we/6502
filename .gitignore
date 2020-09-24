@@ -1,0 +1,4 @@
+*.swp
+/__pycache__
+/eeprom/eeprom_friend/__pycache__
+
