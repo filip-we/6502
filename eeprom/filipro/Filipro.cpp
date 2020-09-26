@@ -5,12 +5,14 @@ Filipro::Filipro()
 {
 }
 
-void Filipro::open(int baudrate=9600)
+void Filipro::open(int baudrate=19200)
 {
+  byte msg;
   Serial.begin(baudrate);
   while(!Serial){};
   while (Serial.available() < 0){};
-  Serial.read();
+  //Serial.read();
+  Serial.readBytes(msg, 1);
   Serial.write(HANDSHAKE);
 }
 

@@ -8,6 +8,7 @@ const int WRITE_ENABLE = A2;//WE, eeprom pin 27
 const int SHIFT_CLOCK = A3;//SRCLK, shift-reg pin 11
 const int SHIFT_LATCH = A4;//RCLK, shift-reg pin 12
 const int SHIFT_DATA = A5;//SER, shift-reg pin 14
+const int DEBUG_PIN_0 = 10;
 
 const int baudrate = 19200;//28800;
 
@@ -55,31 +56,37 @@ void writeEepromAddress(int address, byte data)
     digitalWrite(i, (data & 1));
     data = data >> 1;
   }
-  delay(10);
+  delay(5);
   digitalWrite(WRITE_ENABLE, LOW);
   delayMicroseconds(1);
   digitalWrite(WRITE_ENABLE, HIGH);
-  delay(10);
+  delay(5);
 }
 
 void writeEeprom()
-{
+{  
   setIOPins(OUTPUT);
   int startAddress = (unsigned int) (data[0] << 0x08) + data[1];
-  int stopAddress = (unsigned int) (data[2] << 0x08) + data[3];  
-  fp.write(WRITE_EEPROM_CMD, data, 4);
-  for (int i = startAddress; i <= stopAddress; i = i + 16)
+  int stopAddress = (unsigned int) (data[2] << 0x08) + data[3];
+  int address;
+  int writeDataLen = stopAddress - startAddress;
+  fp.write(WRITE_EEPROM_CMD, data, 0);
+
+  for (address = startAddress; address < (writeDataLen / 16) * 16; address += 16)
   {
-    fp.readWrite(&cmd, &data[0], &dataLen, CONTINUE, data, 0);
-    if (cmd != CONTINUE)
+    fp.readWrite(&cmd, &data[0], &dataLen, CONTINUE_CMD, data, 0);
+    for (int i = address; i < (address + 16); i++)
     {
-      return;
+      writeEepromAddress(i, data[i - address]);
     }
-    cmd = ABORT_CMD;
-    for (int address = i; address < (i + 16); address++)
-    {
-      writeEepromAddress(address, data[address - i]);
-    }
+  }
+  if (stopAddress % 16)
+  {
+    fp.readWrite(&cmd, &data[0], &dataLen, CONTINUE_CMD, data, 0);  
+    for (int j = address; j < stopAddress; j++)
+      {
+        writeEepromAddress(j, data[j - address]);
+      }
   }
   fp.readWrite(&cmd, &data[0], &dataLen, ABORT_CMD, data, 0);
 }
@@ -103,7 +110,7 @@ void readEeprom()
   int startAddress = (unsigned int) (data[0] << 0x08) + data[1];
   int stopAddress = (unsigned int) (data[2] << 0x08) + data[3];
   byte sendData[16];
-  fp.readWrite(&cmd, &data[0], &dataLen, READ_EEPROM_CMD, data, 4);
+  fp.readWrite(&cmd, &data[0], &dataLen, READ_EEPROM_CMD, data, 0);
   for (int i = startAddress; i <= stopAddress; i = i + 16)
   {
     fp.read(&cmd, &data[0], &dataLen);
@@ -130,14 +137,14 @@ void setup()
   digitalWrite(WRITE_ENABLE, HIGH);
   digitalWrite(OUTPUT_ENABLE, HIGH);
   digitalWrite(CHIP_ENABLE, LOW);
-    
+  
   pinMode(SHIFT_DATA, OUTPUT);
   pinMode(SHIFT_CLOCK, OUTPUT);
   pinMode(SHIFT_LATCH, OUTPUT);
   pinMode(WRITE_ENABLE, OUTPUT);
   pinMode(OUTPUT_ENABLE, OUTPUT);
   pinMode(CHIP_ENABLE, OUTPUT);
-
+  
   for (int i = EEPROM_START; i <= EEPROM_END; i++)
   {
     digitalWrite(i, LOW);

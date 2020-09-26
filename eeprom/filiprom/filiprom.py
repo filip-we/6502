@@ -19,6 +19,7 @@ class EepromFriend(object):
         if end > self.max_address:
             raise ValueError(f'Address cannot be larger than {self.max_address}!')
         data = bytearray()
+        print(f'>>> Reading EEPROM {start} to {end} <<<')
         with self.conn as c:
             temp = (start << 16) + end
             temp = temp.to_bytes(4, byteorder='big')
@@ -34,27 +35,25 @@ class EepromFriend(object):
                 self.logger.error('Not aborted properly')
         return data
 
-    def write_eeprom(self, data, start=0):
+    def write_eeprom(self, data, start=0, surpress_print=False):
         if start > self.max_address:
             raise ValueError(f'Address cannot be larger than {self.max_address}!')
         if not (isinstance(data, bytes) or isinstance(data, bytearray)):
             raise TypeError('Data must be provided as bytes or bytearray!')
-        end = start + len(data) - 1
+        end = start + len(data)# - 1
         if end > self.max_address:
             raise ValueError(f'Address cannot be larger than {self.max_address}!')
         with self.conn as c:
             temp = (start << 16) + end
             temp = temp.to_bytes(4, byteorder='big')
-            print(f'Writing EEPROM from {start} to {end}')
+            print(f'>>> Writing EEPROM from {start} to {end} <<<')
             c.write_read(WRITE_EEPROM, temp)
             for address in range(start, end, 16):
-                print(f'Writing ' +  
-                            ''.join([' {:02x}'.format(x) for x in data[address:address + 16]]) +
-                            f' @ {address:04x}')
+                if not surpress_print:
+                    print(f'Address {address:04x} ' + 
+                                ''.join([' {:02x}'.format(x) for x in data[address:address + 16]]))
                 d = c.write_read(CONTINUE, data[address:address + 16])[0]
-                if d == ABORT:
-                    print('Aborting')
-                    break
+            d = c.write_read(ABORT)
 
     def write_eeprom_address(self, address, data):
         if address > self.max_address:

@@ -1,11 +1,11 @@
-from distutils.core import setup
+#from distutils.core import setup
+from setuptools import setup
 
-setup(name='Eprom Friend',
-        version='1.0',
+setup(name='filiprom',
+        version='1.1',
         description='Program to interract with an EEPROM using an Arduino',
-        author='filip-we',
-        packages=['serial'],
-        entry_points={
-                'console_scripts': ['eeprom_friend= eeprom_friend:main']
-                }
+        author='filip-we'#,
+        #entry_points={
+        #        'console_scripts': ['eeprom_friend= eeprom_friend:main']
+        #        }
         )

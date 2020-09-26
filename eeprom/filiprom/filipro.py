@@ -29,7 +29,7 @@ class Filipro(object):
         self.conn.write(HANDSHAKE.to_bytes(1, byteorder='big'))
         data = self.conn.read()
         if data != HANDSHAKE.to_bytes(1, byteorder='big'):
-            raise ValueError('Error with handshake.')
+            raise ValueError(f'Error with handshake; received {data}.')
         self.logger.info('Connection ready!')
 
     def close(self):

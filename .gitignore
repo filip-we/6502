@@ -1,6 +1,7 @@
 *.swp
 a.out
 /__pycache__
-/eeprom/eeprom_friend/__pycache__
+/eeprom/filiprom/__pycache__
+/eeprom/filiprom.egg-info
 /cpu_code/compiler
 
