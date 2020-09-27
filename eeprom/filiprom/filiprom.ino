@@ -1,6 +1,5 @@
 #include <Filipro.h>
-const int EEPROM_START = 2;
-const int EEPROM_END = 9;
+const int DATA_PINS[8] = {2, 3, 4, 5, 6, 7, 8, 9};
 
 const int CHIP_ENABLE = A0;//CE, eeprom pin 20
 const int OUTPUT_ENABLE = A1;//OE, eeprom pin 22
@@ -24,9 +23,9 @@ byte dataLen;
 
 void setIOPins(int mode)
 {
-  for (int i = EEPROM_START; i <= EEPROM_END; i++)
+  for (unsigned int i = 0; i < 8; i++)
   {
-    pinMode(i, mode);
+    pinMode(DATA_PINS[i], mode);
   }
   delay(10);
 }
@@ -42,8 +41,9 @@ byte readEepromAddress(int address){
   setAddress(address);
   digitalWrite(OUTPUT_ENABLE, LOW);
   byte data = 0;
-  for (int i = EEPROM_END; i >= EEPROM_START; i--){
-    data = (data << 1) + digitalRead(i);
+  for (int i = 7; i >= 0; i--)
+  {
+    data = (data << 1) + digitalRead(DATA_PINS[i]);
   }
   digitalWrite(OUTPUT_ENABLE, HIGH);
   return data;
@@ -52,8 +52,9 @@ byte readEepromAddress(int address){
 void writeEepromAddress(int address, byte data)
 {
   setAddress(address);
-  for (int i = EEPROM_START; i <= EEPROM_END; i++){
-    digitalWrite(i, (data & 1));
+  for (int i = 0; i < 8; i++)
+  {
+    digitalWrite(DATA_PINS[i], (data & 1));
     data = data >> 1;
   }
   delay(5);
@@ -145,10 +146,10 @@ void setup()
   pinMode(OUTPUT_ENABLE, OUTPUT);
   pinMode(CHIP_ENABLE, OUTPUT);
   
-  for (int i = EEPROM_START; i <= EEPROM_END; i++)
+  for (int i = 0; i < 8; i++)
   {
-    digitalWrite(i, LOW);
-    pinMode(i, INPUT);
+    digitalWrite(DATA_PINS[i], LOW);
+    pinMode(DATA_PINS[i], INPUT);
   }
 
   fp.open(baudrate);

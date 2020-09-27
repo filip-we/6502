@@ -14,27 +14,25 @@ reset:
   lda #%11100000 ; set top 3 pins on port A to output
   sta DDRA
 
-  ; Init display with 8 bit mode
-  lda #%00111000
+  ; Clear display
+  lda #%00000001
   sta PORTB
   lda #0
   sta PORTA
   lda #E
   sta PORTA
   lda #0
-  sta PORTA
 
-  ; Turn display on
-  lda #%00001110
+  ; Return cursor home
+  lda #%00000010
   sta PORTB
   lda #0
   sta PORTA
   lda #E
   sta PORTA
   lda #0
-  sta PORTA
 
-  ; Set cursor to increment, display to not scroll
+  ; Entry mode
   lda #%00000110
   sta PORTB
   lda #0
@@ -42,8 +40,24 @@ reset:
   lda #E
   sta PORTA
   lda #0
-  sta PORTA
 
+  ; Turning on display
+  lda #%00001111
+  sta PORTB
+  lda #0
+  sta PORTA
+  lda #E
+  sta PORTA
+  lda #0
+
+  ; Function set to 4 bit mode, 1 line display, standard font
+  lda #%00111000
+  sta PORTB
+  lda #0
+  sta PORTA
+  lda #E
+  sta PORTA
+  lda #0
 
   ; Charcter data
   lda #"P"
@@ -67,33 +81,6 @@ reset:
 
 loop:
   jmp loop
-
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
 
 
 ; # means absolute value
