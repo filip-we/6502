@@ -1,13 +1,12 @@
 #include <Filipro.h>
 const int DATA_PINS[8] = {2, 3, 4, 5, 6, 7, 8, 9};
 
-const int CHIP_ENABLE = A0;//CE, eeprom pin 20
+const int WRITE_ENABLE = A0;//WE, eeprom pin 27
 const int OUTPUT_ENABLE = A1;//OE, eeprom pin 22
-const int WRITE_ENABLE = A2;//WE, eeprom pin 27
-const int SHIFT_CLOCK = A3;//SRCLK, shift-reg pin 11
+const int CHIP_ENABLE = A2;//CE, eeprom pin 20
+const int SHIFT_DATA = A3;//SER, shift-reg pin 14
 const int SHIFT_LATCH = A4;//RCLK, shift-reg pin 12
-const int SHIFT_DATA = A5;//SER, shift-reg pin 14
-const int DEBUG_PIN_0 = 10;
+const int SHIFT_CLOCK = A5;//SRCLK, shift-reg pin 11
 
 const int baudrate = 19200;//28800;
 
@@ -132,20 +131,20 @@ void readEeprom()
 
 void setup()
 {
-  digitalWrite(SHIFT_DATA, LOW);
-  digitalWrite(SHIFT_CLOCK, LOW);
-  digitalWrite(SHIFT_LATCH, LOW);
   digitalWrite(WRITE_ENABLE, HIGH);
   digitalWrite(OUTPUT_ENABLE, HIGH);
   digitalWrite(CHIP_ENABLE, LOW);
+  digitalWrite(SHIFT_DATA, LOW);
+  digitalWrite(SHIFT_LATCH, LOW);
+  digitalWrite(SHIFT_CLOCK, LOW);
   
-  pinMode(SHIFT_DATA, OUTPUT);
-  pinMode(SHIFT_CLOCK, OUTPUT);
-  pinMode(SHIFT_LATCH, OUTPUT);
   pinMode(WRITE_ENABLE, OUTPUT);
   pinMode(OUTPUT_ENABLE, OUTPUT);
   pinMode(CHIP_ENABLE, OUTPUT);
-  
+  pinMode(SHIFT_DATA, OUTPUT);
+  pinMode(SHIFT_LATCH, OUTPUT);
+  pinMode(SHIFT_CLOCK, OUTPUT);
+    
   for (int i = 0; i < 8; i++)
   {
     digitalWrite(DATA_PINS[i], LOW);
