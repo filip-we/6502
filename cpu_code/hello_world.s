@@ -22,6 +22,7 @@ reset:
   lda #E
   sta PORTA
   lda #0
+  sta PORTA
 
   ; Return cursor home
   lda #%00000010
@@ -31,6 +32,7 @@ reset:
   lda #E
   sta PORTA
   lda #0
+  sta PORTA
 
   ; Entry mode
   lda #%00000110
@@ -40,6 +42,7 @@ reset:
   lda #E
   sta PORTA
   lda #0
+  sta PORTA
 
   ; Turning on display
   lda #%00001111
@@ -49,6 +52,7 @@ reset:
   lda #E
   sta PORTA
   lda #0
+  sta PORTA
 
   ; Function set to 4 bit mode, 1 line display, standard font
   lda #%00111000
@@ -58,6 +62,57 @@ reset:
   lda #E
   sta PORTA
   lda #0
+  sta PORTA
+
+  ; Charcter data
+  lda #"I"
+  sta PORTB
+  lda #RS
+  sta PORTA
+  lda #(RS | E) ; Sending instruction by setting E bit
+  sta PORTA
+  lda #RS
+  sta PORTA
+
+  ; Charcter data
+  lda #" "
+  sta PORTB
+  lda #RS
+  sta PORTA
+  lda #(RS | E) ; Sending instruction by setting E bit
+  sta PORTA
+  lda #RS
+  sta PORTA
+
+  ; Charcter data
+  lda #"<"
+  sta PORTB
+  lda #RS
+  sta PORTA
+  lda #(RS | E) ; Sending instruction by setting E bit
+  sta PORTA
+  lda #RS
+  sta PORTA
+
+  ; Charcter data
+  lda #"3"
+  sta PORTB
+  lda #RS
+  sta PORTA
+  lda #(RS | E) ; Sending instruction by setting E bit
+  sta PORTA
+  lda #RS
+  sta PORTA
+
+  ; Charcter data
+  lda #" "
+  sta PORTB
+  lda #RS
+  sta PORTA
+  lda #(RS | E) ; Sending instruction by setting E bit
+  sta PORTA
+  lda #RS
+  sta PORTA
 
   ; Charcter data
   lda #"P"
