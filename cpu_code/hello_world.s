@@ -7,8 +7,20 @@ E  = %10000000
 RW = %01000000
 RS = %00100000
 
+; Tells compiler where the ROM is located in the address space.
+  .org $8000
+
 reset:
-  lda #%11111111 ; Set all pins on port b to output
+  lda #%10011001
+  sta $0A00
+
+  lda $0A00
+  sta $0A01
+
+  ldx #$ff
+  txs
+
+  lda #%11111111 ; Set all pins on port B to output
   sta DDRB
 
   lda #%11100000 ; set top 3 pins on port A to output
@@ -16,126 +28,74 @@ reset:
 
   ; Clear display
   lda #%00000001
-  sta PORTB
-  lda #0
-  sta PORTA
-  lda #E
-  sta PORTA
-  lda #0
-  sta PORTA
+  jsr lcd_command
 
   ; Return cursor home
   lda #%00000010
-  sta PORTB
-  lda #0
-  sta PORTA
-  lda #E
-  sta PORTA
-  lda #0
-  sta PORTA
+  jsr lcd_command
 
   ; Entry mode
   lda #%00000110
-  sta PORTB
-  lda #0
-  sta PORTA
-  lda #E
-  sta PORTA
-  lda #0
-  sta PORTA
+  jsr lcd_command
 
   ; Turning on display
   lda #%00001111
-  sta PORTB
-  lda #0
-  sta PORTA
-  lda #E
-  sta PORTA
-  lda #0
-  sta PORTA
+  jsr lcd_command
 
-  ; Function set to 4 bit mode, 1 line display, standard font
+  ; Set to 8 bit mode, 1 line display, standard font
   lda #%00111000
-  sta PORTB
-  lda #0
-  sta PORTA
-  lda #E
-  sta PORTA
-  lda #0
-  sta PORTA
+  jsr lcd_command
 
-  ; Charcter data
-  lda #"I"
-  sta PORTB
-  lda #RS
-  sta PORTA
-  lda #(RS | E) ; Sending instruction by setting E bit
-  sta PORTA
-  lda #RS
-  sta PORTA
+  ; Printing text
+  lda #"A"
+  jsr lcd_send_char
 
-  ; Charcter data
+  lda #"B"
+  jsr lcd_send_char
+
   lda #" "
-  sta PORTB
-  lda #RS
-  sta PORTA
-  lda #(RS | E) ; Sending instruction by setting E bit
-  sta PORTA
-  lda #RS
-  sta PORTA
+  jsr lcd_send_char
 
-  ; Charcter data
-  lda #"<"
-  sta PORTB
-  lda #RS
-  sta PORTA
-  lda #(RS | E) ; Sending instruction by setting E bit
-  sta PORTA
-  lda #RS
-  sta PORTA
-
-  ; Charcter data
-  lda #"3"
-  sta PORTB
-  lda #RS
-  sta PORTA
-  lda #(RS | E) ; Sending instruction by setting E bit
-  sta PORTA
-  lda #RS
-  sta PORTA
-
-  ; Charcter data
-  lda #" "
-  sta PORTB
-  lda #RS
-  sta PORTA
-  lda #(RS | E) ; Sending instruction by setting E bit
-  sta PORTA
-  lda #RS
-  sta PORTA
-
-  ; Charcter data
-  lda #"P"
-  sta PORTB
-  lda #RS
-  sta PORTA
-  lda #(RS | E) ; Sending instruction by setting E bit
-  sta PORTA
-  lda #RS
-  sta PORTA
-
-  ; Charcter data
-  lda #"S"
-  sta PORTB
-  lda #RS
-  sta PORTA
-  lda #(RS | E) ; Sending instruction by setting E bit
-  sta PORTA
-  lda #RS
-  sta PORTA
 
 loop:
   jmp loop
+
+lcd_command:
+  sta PORTB
+  lda #0
+  sta PORTA
+  lda #E
+  sta PORTA
+  lda #0
+  sta PORTA
+
+lcd_send_char:
+  sta PORTB
+  lda #RS
+  sta PORTA
+  lda #(RS | E) ; Sending instruction by toggling E bit
+  sta PORTA
+  lda #RS
+  sta PORTA
+
+
+  nop
+  nop
+  nop
+  nop
+  nop
+  nop
+  nop
+  nop
+  nop
+  nop
+  nop
+  nop
+  nop
+  nop
+  nop
+  nop
+
 
 
 ; # means absolute value
