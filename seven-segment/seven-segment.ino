@@ -1,4 +1,5 @@
-const int DATA_PINS[16] = {A0, A1, A2, A3, A4, A5, 2, 3, 4, 5, 6, 7, 8, 9};
+const int DISPLAY_UPDATE = 2;
+const int DATA_PINS[8] = {3, 4, 5, 6, 7, 8, 9, 10};
 
 const int SHIFT_DATA = 13;//SER, shift-reg pin 14
 const int SHIFT_LATCH = 12;//RCLK, shift-reg pin 12
@@ -34,11 +35,9 @@ void setup()
     
   for (int i = 0; i < 8; i++)
   {
-    digitalWrite(DATA_PINS[i], LOW);
     pinMode(DATA_PINS[i], INPUT);
   }
-  setDisplay(segmentTable[10]);
-
+  attachInterrupt(digitalPinToInterrupt(DISPLAY_UPDATE), readPinsWriteDisplay, FALLING);
 }
 
 void setDisplay(int data){
@@ -50,18 +49,22 @@ void setDisplay(int data){
 
 int readData(){
   int data = 0;
-  for (int i = 15; i >= 0; i--)
+  for (int i = 7; i >= 0; i--)
   {
     data = (data << 1) + digitalRead(DATA_PINS[i]);
   }
   return data;
 }
 
-void loop() {
-  //int data = readData();
-  for (int i = 9; i < 35; i++){
-    setDisplay(i);
-    delay(600);
-  }
+void readPinsWriteDisplay() {
+  int data = readData();
+  delay(1);
+  setDisplay(data);
+}  
 
+void loop() {
+//  for (int i = 0; i < 255; i++){
+//    setDisplay(i);
+//    delay(300);
+//  }
 }
