@@ -1,0 +1,10 @@
+# means absolute value
+$ means hex format
+
+OpCodes
+lda     zeropage        A5
+lda     immediate       A9
+lda     absolute        Ad
+
+sta     absolute        8D
+

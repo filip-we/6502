@@ -11,14 +11,17 @@ RS = %00100000
   .org $8000
 
 reset:
-  lda #%10011001
-  sta $0A00
-
-  lda $0A00
-  sta $0A01
-
   ldx #$ff
   txs
+
+  lda $01ff
+  sta $0200
+  lda $01fe
+  sta $0200
+  lda $01fd
+  sta $0200
+  lda $01fc
+  sta $0200
 
   lda #%11111111 ; Set all pins on port B to output
   sta DDRB
@@ -68,6 +71,7 @@ lcd_command:
   sta PORTA
   lda #0
   sta PORTA
+  rts
 
 lcd_send_char:
   sta PORTB
@@ -77,27 +81,12 @@ lcd_send_char:
   sta PORTA
   lda #RS
   sta PORTA
+  rts
 
+interrupt:
+  jmp interrupt
 
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-
-
-
-; # means absolute value
-; $ means hex format
-
+  .org $fffa
+  .word interrupt
+  .word reset
+  .word interrupt
