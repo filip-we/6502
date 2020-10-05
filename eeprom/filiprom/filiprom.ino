@@ -90,6 +90,17 @@ void writeEeprom()
   }
   fp.readWrite(&cmd, &data[0], &dataLen, ABORT_CMD, data, 0);
 }
+void pageWrite()
+{
+  //First two bytes of message is the address. Next 16 bytes are the data.
+  setIOPins(OUTPUT);
+  int address = (unsigned int) (data[0] << 0x08) + data[1];
+  for (int i = address; i < (address + 16); i++)
+  {
+    writeEepromAddress(i, data[i + 2 - address]);
+  }
+  fp.write(WRITE_EEPROM_ADDRESS, data, 0);
+}
 
 void writeEepromAddressCmd()
 {
@@ -166,7 +177,8 @@ void loop() {
     writeEeprom();
     break;
   case WRITE_EEPROM_ADDRESS:
-    writeEepromAddressCmd();
+    //writeEepromAddressCmd();
+    pageWrite();
     break;
   default:
     fp.write(ABORT, data, dataLen);
