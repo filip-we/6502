@@ -14,14 +14,6 @@ reset:
   ldx #$ff
   txs
 
-  lda $01ff
-  sta $0200
-  lda $01fe
-  sta $0200
-  lda $01fd
-  sta $0200
-  lda $01fc
-  sta $0200
 
   lda #%11111111 ; Set all pins on port B to output
   sta DDRB
@@ -29,34 +21,77 @@ reset:
   lda #%11100000 ; set top 3 pins on port A to output
   sta DDRA
 
-  ; Clear display
+; Clear display
   lda #%00000001
-  jsr lcd_command
+  sta PORTB
+  lda #0
+  sta PORTA
+  lda #E
+  sta PORTA
+  lda #0
+  sta PORTA
 
-  ; Return cursor home
+; Return cursor home
   lda #%00000010
-  jsr lcd_command
+  sta PORTB
+  lda #0
+  sta PORTA
+  lda #E
+  sta PORTA
+  lda #0
+  sta PORTA
 
-  ; Entry mode
+; Entry mode
   lda #%00000110
-  jsr lcd_command
+  sta PORTB
+  lda #0
+  sta PORTA
+  lda #E
+  sta PORTA
+  lda #0
+  sta PORTA
 
-  ; Turning on display
+; Turning on display
   lda #%00001111
-  jsr lcd_command
+  sta PORTB
+  lda #0
+  sta PORTA
+  lda #E
+  sta PORTA
+  lda #0
+  sta PORTA
 
-  ; Set to 8 bit mode, 1 line display, standard font
+; Set to 8 bit mode, 1 line display, standard font
   lda #%00111000
-  jsr lcd_command
+  sta PORTB
+  lda #0
+  sta PORTA
+  lda #E
+  sta PORTA
+  lda #0
+  sta PORTA
 
   ; Printing text
-  lda #"A"
-  jsr lcd_send_char
+  lda #"&"
+  sta PORTB
+  lda #RS
+  sta PORTA
+  lda #(RS | E) ; Sending instruction by toggling E bit
+  sta PORTA
+  lda #RS
+  sta PORTA
 
-  lda #"B"
-  jsr lcd_send_char
 
   lda #" "
+  jsr lcd_send_char
+
+  lda #"J"
+  jsr lcd_send_char
+
+  lda #"S"
+  jsr lcd_send_char
+
+  lda #"R"
   jsr lcd_send_char
 
 

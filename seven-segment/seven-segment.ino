@@ -37,7 +37,7 @@ void setup()
   {
     pinMode(DATA_PINS[i], INPUT);
   }
-  attachInterrupt(digitalPinToInterrupt(DISPLAY_UPDATE), readPinsWriteDisplay, FALLING);
+  attachInterrupt(digitalPinToInterrupt(DISPLAY_UPDATE), readPinsWriteDisplay, CHANGE);
 }
 
 void setDisplay(int data){
