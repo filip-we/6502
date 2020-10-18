@@ -1,0 +1,64 @@
+EESchema Schematic File Version 4
+EELAYER 30 0
+EELAYER END
+$Descr A4 11693 8268
+encoding utf-8
+Sheet 1 1
+Title ""
+Date ""
+Rev ""
+Comp ""
+Comment1 ""
+Comment2 ""
+Comment3 ""
+Comment4 ""
+$EndDescr
+$Comp
+L 74xx:74HC138 U?
+U 1 1 5F8851DF
+P 2250 6200
+F 0 "U?" H 2250 7031 50  0000 C CNN
+F 1 "74HC138" H 2250 6940 50  0000 C CNN
+F 2 "Package_DIP:DIP-16_W7.62mm" H 2250 5650 50  0001 C CNN
+F 3 "https://www.ti.com/lit/ds/symlink/sn74hc138.pdf?ts=1602700727149&ref_url=https%253A%252F%252Fwww.ti.com%252Fproduct%252FSN74HC138" H 1950 5900 50  0001 C CNN
+	1    2250 6200
+	1    0    0    -1  
+$EndComp
+$Comp
+L 6502_components:6502_65C02S U?
+U 1 1 5F87586D
+P 5500 2200
+F 0 "U?" H 5500 3365 50  0000 C CNN
+F 1 "6502_65C02S" H 5500 3274 50  0000 C CNN
+F 2 "Package_DIP:DIP-40_W15.24mm_Socket" H 5500 3250 50  0001 C CNN
+F 3 "" H 5350 3150 50  0001 C CNN
+	1    5500 2200
+	1    0    0    -1  
+$EndComp
+$Comp
+L power:GND #PWR?
+U 1 1 5F878293
+P 6150 3200
+F 0 "#PWR?" H 6150 2950 50  0001 C CNN
+F 1 "GND" H 6155 3027 50  0000 C CNN
+F 2 "" H 6150 3200 50  0001 C CNN
+F 3 "" H 6150 3200 50  0001 C CNN
+	1    6150 3200
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	6000 3200 6150 3200
+$Comp
+L power:GND #PWR?
+U 1 1 5F87AFC5
+P 2250 6750
+F 0 "#PWR?" H 2250 6500 50  0001 C CNN
+F 1 "GND" H 2255 6577 50  0000 C CNN
+F 2 "" H 2250 6750 50  0001 C CNN
+F 3 "" H 2250 6750 50  0001 C CNN
+	1    2250 6750
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	2250 6750 2250 6650
+$EndSCHEMATC

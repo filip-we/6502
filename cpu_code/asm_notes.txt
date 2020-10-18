@@ -79,11 +79,4 @@ READ:   ADDR 1000000001111000 (8078)
 READ:   ADDR 1000000001110110 (8076)
 
 
-I'm having alot of fun building my 65C02-computer recently got around adding the RAM-chip, an HM62256LP-8. I've spent a few days trying to get it to work.  I tried to test the chip by itself and put it in my home made EEPRMOM-programmer, but the chip did not seem to take any writing I did nor outputing anything (the data that was read seemd random, since it was different during consecutive reads). I simplified the setup further by setting up a manual programming circuit, with dip-switches etc., as Ben did to program an EEPROM for a seven segment display long ago. When doing that I accidentaly put a voltage on two of the I/O-pins when the RAM was in output mode. It was on for around 30 seconds until I noticed it and the RAM got slightly warm around those pins. Have anyone had similar incidents with a chip? How did your chips fare after that? I'ts more out of curiousity I ask since I'm pretty convinced something is broken with my RAM-chip, since I've spent alot of time tinkering with it and it haven't even given me garbage data or any signs of life.
-
-Before I go on and ordered a new chip I'm inclined to insert a spare AT28C256 in the RAM's place. As far as I know the pin-out is identical and also the read/write procedures. I'm running the computer on the clock module so the chip will never experience any large amounts of writes, so that should not be an issue. Do you have any thoughts on this?
-Thanks!
-
-
-
 
