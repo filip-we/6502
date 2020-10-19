@@ -7,6 +7,12 @@ E  = %10000000
 RW = %01000000
 RS = %00100000
 
+; ACIA
+ACIA_DATA = $7000
+ACIA_STATUS = ACIA_DATA + 1
+ACIA_COMMAND = ACIA_DATA + 2
+ACIA_CONTROL = ACIA_DATA + 3
+
 ; Tells compiler where the ROM is located in the address space.
   .org $8000
 
@@ -14,91 +20,54 @@ reset:
   ldx #$ff
   txs
 
-
-  lda #%11111111 ; Set all pins on port B to output
+; VIA setup
+  lda #%11111111        ; Set all pins on port B to output
   sta DDRB
-
-  lda #%11100000 ; set top 3 pins on port A to output
+  lda #%11100000        ; set top 3 pins on port A to output
   sta DDRA
 
-; Clear display
-  lda #%00000001
-  sta PORTB
-  lda #0
-  sta PORTA
-  lda #E
-  sta PORTA
-  lda #0
-  sta PORTA
+; LCD-display setup
+  lda #%00000001        ; Clear display
+  jsr send_lcd_command
+  lda #%00000010        ; Return cursor home
+  jsr send_lcd_command
+  lda #%00000110        ; Entry mode
+  jsr send_lcd_command
+  lda #%00001111        ; Turning on display
+  jsr send_lcd_command
+  lda #%00111000        ; Set to 8 bit mode, 1 line display, standard font
+  jsr send_lcd_command
 
-; Return cursor home
-  lda #%00000010
-  sta PORTB
-  lda #0
-  sta PORTA
-  lda #E
-  sta PORTA
-  lda #0
-  sta PORTA
+; ACIA setup
+  lda #%00001011
+  sta ACIA_COMMAND
+  lda #%00011111
+  sta ACIA_CONTROL
 
-; Entry mode
-  lda #%00000110
-  sta PORTB
-  lda #0
-  sta PORTA
-  lda #E
-  sta PORTA
-  lda #0
-  sta PORTA
-
-; Turning on display
-  lda #%00001111
-  sta PORTB
-  lda #0
-  sta PORTA
-  lda #E
-  sta PORTA
-  lda #0
-  sta PORTA
-
-; Set to 8 bit mode, 1 line display, standard font
-  lda #%00111000
-  sta PORTB
-  lda #0
-  sta PORTA
-  lda #E
-  sta PORTA
-  lda #0
-  sta PORTA
-
-  ; Printing text
-  lda #"&"
-  sta PORTB
-  lda #RS
-  sta PORTA
-  lda #(RS | E) ; Sending instruction by toggling E bit
-  sta PORTA
-  lda #RS
-  sta PORTA
-
-
+; "I'm alive" printing
+  lda #">"
+  jsr write_char_lcd
+  lda #">"
+  jsr write_char_lcd
+  lda #">"
+  jsr write_char_lcd
   lda #" "
-  jsr lcd_send_char
-
-  lda #"J"
-  jsr lcd_send_char
-
-  lda #"S"
-  jsr lcd_send_char
-
-  lda #"R"
-  jsr lcd_send_char
+  jsr write_char_lcd
 
 
-loop:
-  jmp loop
 
-lcd_command:
+read_next_rx:
+  lda ACIA_STATUS
+  and #%00001000        ; Check if ReceiverDataRegister is full
+  beq read_next_rx
+
+  lda ACIA_DATA
+  jsr write_char_lcd
+
+  jmp read_next_rx
+
+
+send_lcd_command:
   sta PORTB
   lda #0
   sta PORTA
@@ -108,7 +77,7 @@ lcd_command:
   sta PORTA
   rts
 
-lcd_send_char:
+write_char_lcd:
   sta PORTB
   lda #RS
   sta PORTA
