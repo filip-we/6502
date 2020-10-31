@@ -21,8 +21,8 @@ ACIA_COMMAND = ACIA_DATA + 2
 ACIA_CONTROL = ACIA_DATA + 3
 
 ; CLI buffer
-CLI_LEN = $00
-CLI_BUF = $0200
+CLI_LEN = $0200
+CLI_BUF = $0201
 
 
 ; Tells compiler where the ROM is located in the address space.
@@ -75,6 +75,15 @@ print_loop:
 init_lcd_cursor:
     lda #(%10000000 | LCD_SECOND_LINE)
     jsr send_lcd_command
+    lda #">"
+    jsr write_char_lcd
+
+    lda #$0a
+    jsr write_char_lcd
+    lda #$0c
+    jsr write_char_lcd
+    lda #$0d
+    jsr write_char_lcd
 
     cli                   ; Clear Interrupt disable (i.e. listen for interrupt requests)
 
@@ -98,7 +107,7 @@ interrupt:
     bcc return_from_interrupt     ; Return if no char available
     jsr write_char_lcd
     jsr acia_send_char            ; Echo back to sender
-    ;jsr save_char_to_buffer
+    jsr save_char_to_buffer
 return_from_interrupt:
     pla
     tay
@@ -205,9 +214,9 @@ save_char_to_buffer:
     sta CLI_BUF,x
     inx
     stx CLI_LEN
-    cmp #$0d              ; Compare with char [ENTER]
+    cmp #$0d              ; Compare with char [newline]
+    ;cmp #$23              ; Compare with char # (confirmed to work)
     bne save_char_to_buffer_return
-    ;jsr parse_cmd
     jsr cli_cmd_ready
 save_char_to_buffer_return:
     rts
@@ -234,13 +243,19 @@ cli_cmd_ready:
     jsr send_lcd_command
     lda #%00000010        ; Return cursor home
     jsr send_lcd_command
-    ; do stuff with cmd here
-    lda #"C"
-    jsr write_char_lcd    ; Printing if char is not [ENTER]
-    lda #"M"
-    jsr write_char_lcd    ; Printing if char is not [ENTER]
-    lda #"D"
-    jsr write_char_lcd    ; Printing if char is not [ENTER]
+cli_cmd_ready_print_buffer:
+    ldx #$ff
+cli_cmd_ready_print_buffer_loop:
+    inx
+    lda CLI_BUF, x
+    jsr write_char_lcd
+    cpx CLI_LEN
+    bne cli_cmd_ready_print_buffer_loop
+
+    lda #(%10000000 | LCD_SECOND_LINE)
+    jsr send_lcd_command
+    lda #">"
+    jsr write_char_lcd
 
     ldx #$00
     stx CLI_LEN
@@ -249,7 +264,6 @@ cli_cmd_ready:
 
 string_welcome:
     .byte "== Iroko v0.1 ==", $00
-    .asciiz "asdf"
 
 cmd_test:
     .byte "hej", $00
