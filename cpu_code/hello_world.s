@@ -20,40 +20,42 @@ ACIA_STATUS = ACIA_DATA + 1
 ACIA_COMMAND = ACIA_DATA + 2
 ACIA_CONTROL = ACIA_DATA + 3
 
-; CLI buffer
-CLI_LEN = $0200
-CLI_BUF = $0201
+; Communication buffer
+COM_MODE =        $00       ; 0=read/write to terminal
+COM_BUF_START =   $01
+COM_BUF_END =     $02
+COM_PRINT_START = $03
+COM_BUF =       $0200
 
-
-; Tells compiler where the ROM is located in the address space.
-    .org $8000
+    .org $8000              ; Tells compiler where the ROM is located in the address space.
 
 reset:
-    ldx #$ff              ; Initialize stack pointer
+    ldx #$ff                ; Initialize stack pointer
     txs
-
-    lda #$00              ; Initialize CLI-buffer pointer
-    sta CLI_LEN
+    lda #$00                ; Initialize CLI-buffer pointer
+    sta COM_MODE            ; Initialize communication mode
+    sta COM_BUF_START
+    sta COM_BUF_END
+    sta COM_PRINT_START
 
 ; VIA setup
-    lda #%11111111        ; Set all pins on port B to output
+    lda #%11111111          ; Set all pins on port B to output
     sta DDRB
-    ;lda #%11100000        ; set top 3 pins on port A to output
-    lda #%11111111
+    lda #%11111111          ; Set all pins on port A to output
     sta DDRA
 
 
 ; LCD-display setup
     lda #%00000001        ; Clear display
-    jsr send_lcd_command
+    jsr lcd_send_command
     lda #%00000010        ; Return cursor home
-    jsr send_lcd_command
+    jsr lcd_send_command
     lda #%00000110        ; Entry mode
-    jsr send_lcd_command
+    jsr lcd_send_command
     lda #%00001111        ; Turning on display
-    jsr send_lcd_command
+    jsr lcd_send_command
     lda #%00111000        ; Set to 8 bit mode, 1 line display, standard font
-    jsr send_lcd_command
+    jsr lcd_send_command
 
 ; ACIA setup
 ;         ppmeTTRd
@@ -69,29 +71,110 @@ print_loop:
     lda string_welcome,x
     beq init_lcd_cursor
     jsr acia_send_char
-    jsr write_char_lcd
+    jsr lcd_write_char
     inx
     jmp print_loop
 init_lcd_cursor:
+    lda #$0d                ; Send \r and \n
+    jsr acia_send_char
+    lda #$0a
+    jsr acia_send_char
     lda #(%10000000 | LCD_SECOND_LINE)
-    jsr send_lcd_command
+    jsr lcd_send_command
     lda #">"
-    jsr write_char_lcd
+    jsr lcd_write_char
 
     lda #$0a
-    jsr write_char_lcd
+    jsr lcd_write_char
     lda #$0c
-    jsr write_char_lcd
+    jsr lcd_write_char
     lda #$0d
-    jsr write_char_lcd
+    jsr lcd_write_char
 
     cli                   ; Clear Interrupt disable (i.e. listen for interrupt requests)
 
 
+
+; ----------------------------------------
+; ----- Main -----------------------------
+; ----------------------------------------
 main:
-    lda #DEBUG_1
-    sta PORTA
+    lda COM_MODE
+    cmp #$00
+    bne main                ; Only handle buffer if we are in command-mode
+    jsr print_new_chars     ; Check and print any new chars.
+    jsr check_cli_cmd_ready ; If we have recevied an enter/newline we interpret a command
+    bcs execute_cli_cmd
     jmp main
+
+; When an acia interrupt is triggered we save the byte to the buffer
+; All bytes are written into a circular buffer. We update the pointer and the length when reading/handling bytes. Also check for overflow.
+
+; In the main function we print to LCD and to ACIA. We keep track on where in the buffer we have printed with another pointer. We can disable printing by changing COM_MODE.
+; In the main function we also check if a command is ready. It is detected by checking if the last byte is a newline.
+
+print_new_chars:
+    lda COM_PRINT_START
+    cmp COM_BUF_END
+    beq print_new_chars_return ; If buffer length is zero we don't print. Overflow-safe if COM_BUF_END is not increased all the way up to COM_PRINT_START.
+print_new_chars_loop:
+    ldx COM_PRINT_START
+    lda COM_BUF,x
+    jsr acia_send_char
+    cmp #$0a            ; Ignore [return]
+    beq print_new_chars_loop_check
+    cmp #$0d            ; Execute command if [newline]
+    beq print_new_chars_loop_check
+    jsr lcd_write_char
+print_new_chars_loop_check:
+; check if LCD end of line
+    inx
+    stx COM_PRINT_START
+    cpx COM_BUF_END
+    bne print_new_chars_loop    ; Loop until buffer is empty
+print_new_chars_return:
+    rts
+
+check_cli_cmd_ready:
+    ldx COM_BUF_END
+    lda COM_BUF,x
+    cmp #$0a            ; Ignore [return]
+    beq check_cli_cmd_ready_return_not_ready
+    cmp #$0d            ; Execute command if [newline]
+    beq check_cli_cmd_ready_return_ready
+check_cli_cmd_ready_return_not_ready:
+    clc
+    rts
+check_cli_cmd_ready_return_ready:
+    sec
+    rts
+
+
+execute_cli_cmd:
+    lda #%00000001        ; Clear display
+    jsr lcd_send_command
+    lda #%00000010        ; Return cursor home
+    jsr lcd_send_command
+    lda #$0d                ; Send \r and \n
+    jsr acia_send_char
+    lda #$0a
+    jsr acia_send_char
+    ldx COM_BUF_START
+execute_cli_cmd_print_buffer_loop:
+    lda COM_BUF, x
+    jsr lcd_write_char
+    inx
+    cpx COM_BUF_END
+    bne execute_cli_cmd_print_buffer_loop
+
+    lda #(%10000000 | LCD_SECOND_LINE)
+    jsr lcd_send_command
+    lda #">"
+    jsr lcd_write_char
+
+    ldx COM_BUF_START
+    stx COM_BUF_END
+    rts
 
 
 interrupt:
@@ -105,9 +188,7 @@ interrupt:
     sta PORTA
     jsr acia_receive_char         ; Read char if available
     bcc return_from_interrupt     ; Return if no char available
-    jsr write_char_lcd
-    jsr acia_send_char            ; Echo back to sender
-    jsr save_char_to_buffer
+    jsr acia_interrupt
 return_from_interrupt:
     pla
     tay
@@ -147,7 +228,15 @@ acia_send_char:
     rts
 
 
-send_lcd_command:
+acia_interrupt:
+    ldx COM_BUF_END         ; Store all incomming bytes in the buffer.
+    sta COM_BUF,x
+    inx
+    stx COM_BUF_END
+    rts
+
+
+lcd_send_command:
     jsr lcd_wait
     sta PORTB
     lda #0
@@ -159,7 +248,7 @@ send_lcd_command:
     rts
 
 
-write_char_lcd:
+lcd_write_char:
     jsr lcd_wait
     sta PORTB
     pha
@@ -184,7 +273,6 @@ lcd_wait_loop:
     sta PORTA
     lda PORTB
     and #%10000000        ; Check BusyFlag bit. Will set the Z flag if the result is zero, ie lcd is not busy
-    ;cmp #%10000000        ; Compare with A by pretending to subtract the value from A
     bne lcd_wait_loop
 
     lda #RW
@@ -201,64 +289,6 @@ delay_loop_x:
 delay_loop_y:
     dey
     bne delay_loop_y
-    rts
-
-
-save_char_to_buffer:
-    pha
-    lda #DEBUG_1
-    sta PORTA
-    pla
-
-    ldx CLI_LEN
-    sta CLI_BUF,x
-    inx
-    stx CLI_LEN
-    cmp #$0d              ; Compare with char [newline]
-    ;cmp #$23              ; Compare with char # (confirmed to work)
-    bne save_char_to_buffer_return
-    jsr cli_cmd_ready
-save_char_to_buffer_return:
-    rts
-
-; Searching for predefined commands
-; Not finished
-parse_cmd:
-    ldx CLI_LEN
-    dex                   ; Skip the [ENTER]
-parse_cmd_loop:
-    dex
-    beq parse_cmd_return
-    jmp parse_cmd_loop
-parse_cmd_return:
-    pha
-    lda #$00              ; Reset cmd-buffer
-    sta CLI_LEN
-    pla
-    rts
-
-
-cli_cmd_ready:
-    lda #%00000001        ; Clear display
-    jsr send_lcd_command
-    lda #%00000010        ; Return cursor home
-    jsr send_lcd_command
-cli_cmd_ready_print_buffer:
-    ldx #$ff
-cli_cmd_ready_print_buffer_loop:
-    inx
-    lda CLI_BUF, x
-    jsr write_char_lcd
-    cpx CLI_LEN
-    bne cli_cmd_ready_print_buffer_loop
-
-    lda #(%10000000 | LCD_SECOND_LINE)
-    jsr send_lcd_command
-    lda #">"
-    jsr write_char_lcd
-
-    ldx #$00
-    stx CLI_LEN
     rts
 
 
