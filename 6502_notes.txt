@@ -1,3 +1,18 @@
+/// January 2021
+Two types of interractions with the computer is desired:
+1. Communication between a PC and the computer via a UART
+2. Flash or read the RAM from a PC
+
+
+The 6502 can only communicate in parallell. Can I use a 6522 to implement any serial protocols?
+Yes, I can implement both UART and ISP on a 6522. However, the 6551 does most of the stuff already and it's bug can be fixed using a 6522 as well.
+
+Idea: Native Bootloader
+
+
+
+
+/// October 2020
 --- Terminal Connection ---
 AICA: Data + address -> UART
 USB-chip: UART -> USB
