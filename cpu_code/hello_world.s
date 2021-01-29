@@ -7,7 +7,7 @@ E =  %10000000
 RW = %01000000
 RS = %00100000
 
-DEBUG_IRQ =   %00000001
+;DEBUG_IRQ =   %00000001
 DEBUG_1 =     %00000010
 DEBUG_2 =     %00000100
 DEBUG_3 =     %00001000
@@ -41,7 +41,8 @@ reset:
 ; VIA setup
     lda #%11111111          ; Set all pins on port B to output
     sta DDRB
-    lda #%11111111          ; Set all pins on port A to output
+    ;lda #%11111111          ; Set all pins on port A to output
+    lda #%11111110          ; Set PA0 to input, PA1 to PA7 to output
     sta DDRA
 
 
@@ -64,7 +65,29 @@ reset:
     lda #%00011111
     sta ACIA_CONTROL
 
+; ----------------------------------------
+; ----- Check boot-mode ----------------
+; ----------------------------------------
+    lda PORTA               ; Read Port A
+    and #%00000001          ; Get least significant bit of Port A
+    ;cmp #%00000000          ; Compare with 0
+    beq ram_write           ; Branch if result is zero (i.e. boot mode)
+    jmp print_welcome
 
+ram_write:
+    lda #"B"
+    jsr lcd_write_char
+    lda #"o"
+    jsr lcd_write_char
+    lda #"o"
+    jsr lcd_write_char
+    lda #"t"
+    jsr lcd_write_char
+    jmp main
+
+; ----------------------------------------
+; ----- Normal Reset ---------------------
+; ----------------------------------------
 print_welcome:            ; Print welcome message
     ldx #$00
 print_loop:
@@ -184,8 +207,8 @@ interrupt:
     tya
     pha
 
-    lda #DEBUG_IRQ
-    sta PORTA
+    ;lda #DEBUG_IRQ
+    ;sta PORTA
     jsr acia_receive_char         ; Read char if available
     bcc return_from_interrupt     ; Return if no char available
     jsr acia_interrupt
@@ -290,7 +313,6 @@ delay_loop_y:
     dey
     bne delay_loop_y
     rts
-
 
 string_welcome:
     .byte "== Iroko v0.1 ==", $00
