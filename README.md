@@ -9,6 +9,12 @@ http://www.compilers.de/vasm.html
 Run the exe with argument "-Fbin -dotdir".
 Show output with powershell's "Format-Hex a.out"
 
+# RAM-boot mode
+RAM is between 0 and 3fff.
+00 to ff is ZP, 0100 to 01ff is the hardware stack. Let 0200 to 0fff be reserved to variables.
+Then bootable code can start at 1000, nice and even. Page write will be done in slices of 16 bytes, for example between 1000 and 10ff.
+
+
 # OpCodes
 txs     ..              9A
 rts                     60
@@ -27,50 +33,33 @@ sta     absolute        8D
 ;   Check overflow: if yes inc high byte
 ;   Loop
 
+lda #$01
+sta $0200
+lda #$03
+sta $0201
+lda #$04
+sta $0202
 
-
-/// Test of subroutine with arguments via custom stack
-main:
-lda #$10
+lda #$10    ; Initialize stack-pointer
 tax
 
-LDA #$aa
-STA $0200
-LDA #$bb
-STA $0201
-lda #$cc
-sta $0202
-lda #$dd
-sta $0203
-lda #$00
-sta $0204
-
-
-; load pointer into stack
+lda #$02    ; Push array pointer to stack
 dex
-dex
-lda #$02
-sta 1,x
-lda #$01
 sta 0,x
-jsr print
+lda #$00
+dex
+sta 0,x
 
-loop:
-jmp loop
+lda #$00
+tay
+print_array:
+  lda ($00, x)  ; Load accumulator with value from an address found at ($00 + x)
+  sta $0300,y   ; Print
+  iny
+  inc $00, x    ; Increase low byte
+  bne print_array   ; Check overflow
+  inc $01, x
 
-
-print:
-txa
-pha
-print_loop:
-  lda ($00,x)
-  sta $0210,x
-  inx
-  cmp #$00
-  bne print_loop
-  pla
-  tax
-  rti
 
 
 /// January 2021

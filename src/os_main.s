@@ -34,8 +34,11 @@ BOOT_MODE = $0210
 
     .org $8000              ; Tells compiler where the ROM is located in the address space.
 
+; ----------------------------------------
+; ----- Reset ----------------------------
+; ----------------------------------------
 reset:
-    ldx #$ff                ; Initialize stack pointer
+    ldx #$ff                ; Initialize stack pointers for data and hardware stacks
     txs
     lda #$00                ; Initialize CLI-buffer pointer
     sta COM_MODE            ; Initialize communication mode
@@ -83,43 +86,46 @@ reset:
 ; ----------------------------------------
 boot_mode_ram_write:
     lda #$01
-    sta BOOT_MODE           ; RAM-write boot-mode is $01
-;string_ram_boot_mode
+    sta BOOT_MODE                   ; RAM-write boot-mode is $01
     dex
     dex
-    lda #>string_ram_boot_mode
+    lda #>string_ram_boot_mode      ; High byte
     sta 1, x
-    lda #<string_ram_boot_mode
+    lda #<string_ram_boot_mode      ; Low byte
     sta 0, x
-
-
-    ;lda #"B"
-    ;jsr lcd_write_char
+    jsr print_string
+    inx                             ; Free up data stack
     inx
-    inx
-    jmp main
 
-print_string:
-    lda ($00,x)             ; Loads data from the address found at the data stack pointer (x)
-    tax
+ram_boot_loop:
+    jmp ram_boot_loop
+
+; Read three incomming bytes as an instruction.
+; Instruction: "page write", "boot/done" or "unknown"
+; Instruction put in data stack to make is accessable
+ram_boot_interrupt:
+    jsr acia_receive_char       ; Read char if available
+    bcc return_from_interrupt   ; Return if no char available
+; Behaviour depends firstly on if the byte is an instruction or data.
+; If it is a command we should save it somewhere.
+; If it is data we need to know on which page we are at and which byte in the order we are on.
 
 ; ----------------------------------------
 ; ----- Normal boot-mode -----------------
 ; ----------------------------------------
 boot_mode_standard:
-    txa
-    pha
-    ldx #$00
-print_loop:
-    lda string_welcome,x
-    beq init_lcd_cursor
-    jsr acia_send_char
-    jsr lcd_write_char
+    dex
+    dex
+    lda #>string_standard_boot_mode ; High byte
+    sta 1, x
+    lda #<string_standard_boot_mode ; Low byte
+    sta 0, x
+    jsr print_string
+    inx                             ; Free up data stack
     inx
-    jmp print_loop
+    jmp init_lcd_cursor
+
 init_lcd_cursor:
-    pla
-    tax
     lda #$0d                ; Send \r and \n
     jsr acia_send_char
     lda #$0a
@@ -128,17 +134,7 @@ init_lcd_cursor:
     jsr lcd_send_command
     lda #">"
     jsr lcd_write_char
-
-    lda #$0a
-    jsr lcd_write_char
-    lda #$0c
-    jsr lcd_write_char
-    lda #$0d
-    jsr lcd_write_char
-
     cli                   ; Clear Interrupt disable (i.e. listen for interrupt requests)
-
-
 
 ; ----------------------------------------
 ; ----- Main -----------------------------
@@ -221,6 +217,20 @@ execute_cli_cmd_print_buffer_loop:
     stx COM_BUF_END
     rts
 
+; ----------------------------------------
+; ----- Subroutines & interrupts ---------
+; ----------------------------------------
+print_string:
+    lda ($00, x)  ; Finds the address at top of the data stack and loads the accumulator with value from that address
+    cmp #$00
+    beq print_string_return
+    jsr lcd_write_char
+    inc $00, x
+    bne print_string
+    inc $01, x
+    bne print_string
+print_string_return:
+    rts
 
 interrupt:
     pha
@@ -229,11 +239,15 @@ interrupt:
     tya
     pha
 
+    lda BOOT_MODE               ; Check if we are in RAM-boot mode
+    cmp #$00
+    beq ram_boot_interrupt
+
     ;lda #DEBUG_IRQ
     ;sta PORTA
-    jsr acia_receive_char         ; Read char if available
-    bcc return_from_interrupt     ; Return if no char available
-    jsr acia_interrupt            ; Store char in RAM-buffer
+    jsr acia_receive_char       ; Read char if available
+    bcc return_from_interrupt   ; Return if no char available
+    jsr acia_interrupt          ; Store char in RAM-buffer
 return_from_interrupt:
     pla
     tay
@@ -241,7 +255,6 @@ return_from_interrupt:
     tax
     pla
     rti
-
 
 acia_receive_char:                ; Reads a char from ACIA if there is one
     clc
@@ -252,7 +265,6 @@ acia_receive_char:                ; Reads a char from ACIA if there is one
     sec
 acia_receive_char_return:
     rts
-
 
 acia_send_char:
     pha
@@ -272,14 +284,12 @@ acia_send_char:
     sta ACIA_DATA
     rts
 
-
 acia_interrupt:
     ldx COM_BUF_END         ; Store all incomming bytes in the buffer.
     sta COM_BUF,x
     inx
     stx COM_BUF_END
     rts
-
 
 lcd_send_command:
     jsr lcd_wait
@@ -291,7 +301,6 @@ lcd_send_command:
     lda #0
     sta PORTA
     rts
-
 
 lcd_write_char:
     jsr lcd_wait
@@ -305,7 +314,6 @@ lcd_write_char:
     sta PORTA
     pla
     rts
-
 
 lcd_wait:
     pha
@@ -336,14 +344,11 @@ delay_loop_y:
     bne delay_loop_y
     rts
 
-string_welcome:
-    .byte "== Iroko v0.1 ==", $00
+string_standard_boot_mode:
+    .byte "== Iroko v0.2 ==", $00
 
 string_ram_boot_mode:
     .byte "RAM-boot mode", $00
-
-cmd_test:
-    .byte "hej", $00
 
     .org $fffa
     .word interrupt
