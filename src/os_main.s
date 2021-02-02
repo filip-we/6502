@@ -20,12 +20,17 @@ ACIA_STATUS = ACIA_DATA + 1
 ACIA_COMMAND = ACIA_DATA + 2
 ACIA_CONTROL = ACIA_DATA + 3
 
+; ----------------------------------------
+; ----- RAM-variables --------------------
+; ----------------------------------------
 ; Communication buffer
-COM_MODE =        $00       ; 0=read/write to terminal
-COM_BUF_START =   $01
-COM_BUF_END =     $02
-COM_PRINT_START = $03
-COM_BUF =       $0200
+COM_MODE =        $0200       ; 0=read/write to terminal
+COM_BUF_START =   $0201
+COM_BUF_END =     $0202
+COM_PRINT_START = $0203
+COM_BUF =       $0300
+
+BOOT_MODE = $0210
 
     .org $8000              ; Tells compiler where the ROM is located in the address space.
 
@@ -37,6 +42,8 @@ reset:
     sta COM_BUF_START
     sta COM_BUF_END
     sta COM_PRINT_START
+
+    sta BOOT_MODE           ; Set boot mode to standard (=0)
 
 ; VIA setup
     lda #%11111111          ; Set all pins on port B to output
@@ -65,30 +72,43 @@ reset:
     lda #%00011111
     sta ACIA_CONTROL
 
-; ----------------------------------------
-; ----- Check boot-mode ----------------
-; ----------------------------------------
     lda PORTA               ; Read Port A
     and #%00000001          ; Get least significant bit of Port A
     ;cmp #%00000000          ; Compare with 0
-    beq ram_write           ; Branch if result is zero (i.e. boot mode)
-    jmp print_welcome
+    beq boot_mode_ram_write           ; Branch if result is zero (i.e. boot mode)
+    jmp boot_mode_standard
 
-ram_write:
-    lda #"B"
-    jsr lcd_write_char
-    lda #"o"
-    jsr lcd_write_char
-    lda #"o"
-    jsr lcd_write_char
-    lda #"t"
-    jsr lcd_write_char
+; ----------------------------------------
+; ----- RAM-write boot-mode --------------
+; ----------------------------------------
+boot_mode_ram_write:
+    lda #$01
+    sta BOOT_MODE           ; RAM-write boot-mode is $01
+;string_ram_boot_mode
+    dex
+    dex
+    lda #>string_ram_boot_mode
+    sta 1, x
+    lda #<string_ram_boot_mode
+    sta 0, x
+
+
+    ;lda #"B"
+    ;jsr lcd_write_char
+    inx
+    inx
     jmp main
 
+print_string:
+    lda ($00,x)             ; Loads data from the address found at the data stack pointer (x)
+    tax
+
 ; ----------------------------------------
-; ----- Normal Reset ---------------------
+; ----- Normal boot-mode -----------------
 ; ----------------------------------------
-print_welcome:            ; Print welcome message
+boot_mode_standard:
+    txa
+    pha
     ldx #$00
 print_loop:
     lda string_welcome,x
@@ -98,6 +118,8 @@ print_loop:
     inx
     jmp print_loop
 init_lcd_cursor:
+    pla
+    tax
     lda #$0d                ; Send \r and \n
     jsr acia_send_char
     lda #$0a
@@ -211,7 +233,7 @@ interrupt:
     ;sta PORTA
     jsr acia_receive_char         ; Read char if available
     bcc return_from_interrupt     ; Return if no char available
-    jsr acia_interrupt
+    jsr acia_interrupt            ; Store char in RAM-buffer
 return_from_interrupt:
     pla
     tay
@@ -316,6 +338,9 @@ delay_loop_y:
 
 string_welcome:
     .byte "== Iroko v0.1 ==", $00
+
+string_ram_boot_mode:
+    .byte "RAM-boot mode", $00
 
 cmd_test:
     .byte "hej", $00
