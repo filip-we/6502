@@ -1,5 +1,8 @@
 # README
 
+# Connect to serial port on Linux
+tio -b 19200 /dev/ttyACM0
+
 # EEPROM
 I've changed wiring compared with Ben's programmer.
 
