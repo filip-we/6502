@@ -57,7 +57,6 @@ reset:
     lda #%11111110          ; Set PA0 to input, PA1 to PA7 to output
     sta DDRA
 
-
 ; LCD-display setup
     lda #%00000001        ; Clear display
     jsr lcd_send_command
@@ -116,11 +115,11 @@ boot_mode_standard:
     lda #<string_standard_boot_mode ; Low byte
     sta 0, x
     jsr print_string
-    lda #>string_standard_boot_mode ; High byte
-    sta 1, x
-    lda #<string_standard_boot_mode ; Low byte
-    sta 0, x
-    jsr send_string
+    ;lda #>string_standard_boot_mode ; High byte
+    ;sta 1, x
+    ;lda #<string_standard_boot_mode ; Low byte
+    ;sta 0, x
+    ;jsr send_string
     inx                             ; Free up data stack
     inx
     jmp init_lcd_cursor
@@ -137,13 +136,42 @@ init_lcd_cursor:
     cli                   ; Clear Interrupt disable (i.e. listen for interrupt requests)
 
 main:
+    ; Check if we got any chars in the buffer. If we do, check the first one. If it is an \r we clean the LCD-screen. Then we move the start-pointer forward.
+    lda COM_BUF_START
+    cmp COM_BUF_END
+    beq main
+    lda #"&"
+    jsr lcd_write_char
+    jsr acia_send_char
+
+    tax
+    lda COM_BUF, x
+    inc COM_BUF_START
+    cmp #$0a
+    beq nl_char_detected
+    cmp #$0d
+    beq main                ; Ignore CR
+    jsr lcd_write_char
+    jsr acia_send_char
+
+    jmp main
+
+nl_char_detected:
+    lda #%00000001
+    jsr lcd_send_command
+    lda #"&"
+    jsr lcd_write_char
+    jmp main
+
+; OLD MAIN
+old_main:
     ;lda COM_MODE
     ;cmp #$00
     ;bne main                ; Only handle buffer if we are in command-mode
     jsr print_new_chars     ; Check and print any new chars.
     jsr check_cli_cmd_ready ; If we have recevied an enter/newline we interpret a command
     bcs execute_cli_cmd
-    jmp main
+    jmp old_main
 
 ; When an acia interrupt is triggered we save the byte to the buffer
 ; All bytes are written into a circular buffer. We update the pointer and the length when reading/handling bytes. Also check for overflow.
@@ -187,7 +215,6 @@ check_cli_cmd_ready_return_ready:
     sec
     rts
 
-
 execute_cli_cmd:
     lda #%00000001        ; Clear display
     jsr lcd_send_command
@@ -221,18 +248,19 @@ interrupt:
     pha
     txa
     pha
-    lda BOOT_MODE               ; Check if we are in RAM-boot mode
-    cmp #$00
+    lda BOOT_MODE                       ; Check if we are in RAM-boot mode
+    cmp #$01
     beq ram_boot_interrupt
-
-    tya
+    tya                                 ; Otherwise standard-interrupt
     pha
-    jsr acia_receive_char       ; Read char if available
-    bcc return_from_interrupt   ; Return if no char available
-    jsr acia_interrupt          ; Store char in RAM-buffer
+    jsr acia_receive_char               ; Read char if available
+    bcc return_from_standard_interrupt  ; Return if no char available
+    jsr lcd_write_char
     jsr acia_send_char
-
-return_from_interrupt:
+    ldx COM_BUF_END
+    sta COM_BUF,x                       ; Store received byte in the buffer.
+    inc COM_BUF_END
+return_from_standard_interrupt:
     pla
     tay
     pla
@@ -301,6 +329,18 @@ ram_boot_data:
     sta ($00, x)                ; (Store data in RAM_BOOT_ADDRESS + x)
     jmp return_from_ram_boot_interrupt
 
+; ----------------------------------------
+; ----- Strings --------------------------
+; ----------------------------------------
+string_standard_boot_mode:
+    .byte "== Iroko v0.3 ==", $00
+
+string_ram_boot_mode:
+    .byte "RAM-boot mode", $00
+
+; ----------------------------------------
+; ----- Local Subroutines ----------------
+; ----------------------------------------
 acia_receive_char:                ; Reads a char from ACIA if there is one
     clc
     lda ACIA_STATUS
@@ -339,14 +379,6 @@ send_string:
     inc $01, x
     bne send_string
 send_string_return:
-    rts
-
-
-acia_interrupt:
-    ldx COM_BUF_END         ; Store all incomming bytes in the buffer.
-    sta COM_BUF,x
-    inx
-    stx COM_BUF_END
     rts
 
 lcd_send_command:
@@ -402,18 +434,17 @@ delay_loop_y:
     bne delay_loop_y
     rts
 
-string_standard_boot_mode:
-    .byte "== Iroko v0.3 ==", $00
-
-string_ram_boot_mode:
-    .byte "RAM-boot mode", $00
-
+; ----------------------------------------
+; ----- Common Subroutines ---------------
+; ----------------------------------------
     .org $e000
+
 print_string:
     lda ($00, x)  ; Finds the address at top of the data stack and loads the accumulator with value from that address
     cmp #$00
     beq print_string_return
     jsr lcd_write_char
+    jsr acia_send_char
     inc $00, x
     bne print_string
     inc $01, x
