@@ -1,6 +1,7 @@
 ; ----------------------------------------
 ; ----- CONSTANTS & ADDRESSES ------------
 ; ----------------------------------------
+STACK = $0100
 
 PORTB = $6000
 PORTA = $6001
@@ -11,6 +12,8 @@ E =  %10000000
 RW = %01000000
 RS = %00100000
 
+LCD_CLEAR_DISPLAY = %00000001
+LCD_CURSOR_HOME = %00000010
 LCD_SECOND_LINE = $40
 
 ACIA_DATA = $7000
@@ -36,6 +39,15 @@ RAM_BOOT_COMMAND = $0211
 RAM_BOOT_ADDRESS = $0212
 
     .org $8000              ; Tells compiler where the ROM is located in the address space.
+
+push_axy:
+.macro
+    pha
+    txa
+    pha
+    tya
+    pha
+.endmacro
 
 ; ----------------------------------------
 ; ----- Reset ----------------------------
@@ -76,6 +88,10 @@ reset:
     lda #%00011111          ; No stop bit, 8 bit word, Baud-generator, 19,200 bit/s
     sta ACIA_CONTROL
 
+; Send clear-terminal command
+    jsr send_clear_terminal_cmd
+
+; Boot mode selection
     lda PORTA               ; Read Port A
     and #%00000001          ; Get least significant bit of Port A
     ;cmp #%00000000          ; Compare with 0
@@ -115,63 +131,58 @@ boot_mode_standard:
     lda #<string_standard_boot_mode ; Low byte
     sta 0, x
     jsr print_string
-    ;lda #>string_standard_boot_mode ; High byte
-    ;sta 1, x
-    ;lda #<string_standard_boot_mode ; Low byte
-    ;sta 0, x
-    ;jsr send_string
     inx                             ; Free up data stack
     inx
-    jmp init_lcd_cursor
 
-init_lcd_cursor:
-    ;lda #$0d                ; Send \r and \n
-    ;jsr acia_send_char
-    lda #$0a
-    jsr acia_send_char
     lda #(%10000000 | LCD_SECOND_LINE)
     jsr lcd_send_command
     lda #">"
     jsr lcd_write_char
+    jsr acia_send_char
     cli                   ; Clear Interrupt disable (i.e. listen for interrupt requests)
 
 main:
-    ; Check if we got any chars in the buffer. If we do, check the first one. If it is an \r we clean the LCD-screen. Then we move the start-pointer forward.
     lda COM_BUF_START
     cmp COM_BUF_END
-    beq main
-    lda #"&"
+    bpl main                ; Branch if COM_BUF_START >= COM_BUF_END
+
+    lda #%00000001
+    jsr lcd_send_command
+    lda #%00000010
+    jsr lcd_send_command
+
+    lda COM_BUF_START
+    jsr print_hex_value
+    lda #" "
     jsr lcd_write_char
     jsr acia_send_char
 
+    lda COM_BUF_START
     tax
     lda COM_BUF, x
     inc COM_BUF_START
+    cmp #$0d                ; Ignore CR
+    beq main
     cmp #$0a
     beq nl_char_detected
-    cmp #$0d
-    beq main                ; Ignore CR
     jsr lcd_write_char
     jsr acia_send_char
 
+    lda #" "
+    jsr lcd_write_char
+    jsr acia_send_char
+    lda COM_BUF_START
+    jsr print_hex_value
     jmp main
 
 nl_char_detected:
-    lda #%00000001
-    jsr lcd_send_command
-    lda #"&"
+    lda #$0d
+    jsr acia_send_char
+    lda #$0a
+    jsr acia_send_char
+    lda #" "
     jsr lcd_write_char
     jmp main
-
-; OLD MAIN
-old_main:
-    ;lda COM_MODE
-    ;cmp #$00
-    ;bne main                ; Only handle buffer if we are in command-mode
-    jsr print_new_chars     ; Check and print any new chars.
-    jsr check_cli_cmd_ready ; If we have recevied an enter/newline we interpret a command
-    bcs execute_cli_cmd
-    jmp old_main
 
 ; When an acia interrupt is triggered we save the byte to the buffer
 ; All bytes are written into a circular buffer. We update the pointer and the length when reading/handling bytes. Also check for overflow.
@@ -245,18 +256,22 @@ execute_cli_cmd_print_buffer_loop:
 ; ----- Subroutines & interrupts ---------
 ; ----------------------------------------
 interrupt:
+    rti
+
+non_maskable_interrupt:
     pha
     txa
     pha
     lda BOOT_MODE                       ; Check if we are in RAM-boot mode
     cmp #$01
     beq ram_boot_interrupt
-    tya                                 ; Otherwise standard-interrupt
+standard_interrupt:
+    tya
     pha
     jsr acia_receive_char               ; Read char if available
     bcc return_from_standard_interrupt  ; Return if no char available
-    jsr lcd_write_char
-    jsr acia_send_char
+    ;jsr lcd_write_char
+    ;jsr acia_send_char
     ldx COM_BUF_END
     sta COM_BUF,x                       ; Store received byte in the buffer.
     inc COM_BUF_END
@@ -330,13 +345,16 @@ ram_boot_data:
     jmp return_from_ram_boot_interrupt
 
 ; ----------------------------------------
-; ----- Strings --------------------------
+; ----- Strings & Tables -----------------
 ; ----------------------------------------
 string_standard_boot_mode:
-    .byte "== Iroko v0.3 ==", $00
+    .byte "== Iroko v0.4 ==", $00
 
 string_ram_boot_mode:
     .byte "RAM-boot mode", $00
+
+table_byte_to_char:
+    .byte "0123456789abcdef"
 
 ; ----------------------------------------
 ; ----- Local Subroutines ----------------
@@ -452,8 +470,60 @@ print_string:
 print_string_return:
     rts
 
+send_clear_terminal_cmd:
+    lda #$1b
+    jsr acia_send_char
+    lda #$5b
+    jsr acia_send_char
+    lda #$32
+    jsr acia_send_char
+    lda #$4a
+    jsr acia_send_char
+    rts
 
+print_hex_value:
+    pha
+    txa
+    pha
+    tya
+    pha
+
+    lda #"$"
+    jsr lcd_write_char
+    jsr acia_send_char
+
+    tsx
+    inx
+    inx
+    lda STACK, x            ; Get back accumulator
+    lsr
+    lsr
+    lsr
+    lsr
+    and #%00001111
+    tay
+    lda table_byte_to_char, y
+    jsr lcd_write_char
+    jsr acia_send_char
+
+    lda STACK, x            ; Get back accumulator
+    and #%00001111
+    tay
+    lda table_byte_to_char, y
+    jsr lcd_write_char
+    jsr acia_send_char
+
+    pla
+    tay
+    pla
+    tax
+    pla
+    rts
+; ----------------------------------------
+; ----- Address Vectors ------------------
+; ----------------------------------------
     .org $fffa
     .word interrupt
     .word reset
-    .word interrupt
+    .word non_maskable_interrupt
+
