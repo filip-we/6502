@@ -1,32 +1,16 @@
+    .include "acia.s"
+    .include "via1.s"
+
+    .import __STACK_START__
+
 ; ----------------------------------------
 ; ----- CONSTANTS & ADDRESSES ------------
 ; ----------------------------------------
-STACK = $0100
-
-PORTB = $6000
-PORTA = $6001
-DDRB = $6002
-DDRA = $6003
-
-E =  %10000000
-RW = %01000000
-RS = %00100000
-
-LCD_CLEAR_DISPLAY = %00000001
-LCD_CURSOR_HOME = %00000010
-LCD_SECOND_LINE = $40
-
-ACIA_DATA = $7000
-ACIA_STATUS = ACIA_DATA + 1
-ACIA_COMMAND = ACIA_DATA + 2
-ACIA_CONTROL = ACIA_DATA + 3
+STACK = __STACK_START__
 
 RAM_BOOT_COMMAND_WRITE = $00
 RAM_BOOT_COMMAND_BOOT_NOW = $0f
 
-; ----------------------------------------
-; ----- RAM-variables --------------------
-; ----------------------------------------
 ; Communication buffer
 COM_MODE =        $0200       ; 0=read/write to terminal
 COM_BUF_START =   $0201
@@ -38,16 +22,16 @@ BOOT_MODE = $0210
 RAM_BOOT_COMMAND = $0211
 RAM_BOOT_ADDRESS = $0212
 
-    .org $8000              ; Tells compiler where the ROM is located in the address space.
+    .segment "CODE"
 
-push_axy:
-.macro
-    pha
-    txa
-    pha
-    tya
-    pha
-.endmacro
+;push_axy:
+;.macro
+;    pha
+;    txa
+;    pha
+;    tya
+;    pha
+;.endmacro
 
 ; ----------------------------------------
 ; ----- Reset ----------------------------
@@ -136,7 +120,7 @@ boot_mode_standard:
 
     lda #(%10000000 | LCD_SECOND_LINE)
     jsr lcd_send_command
-    lda #">"
+    lda #'>'
     jsr lcd_write_char
     jsr acia_send_char
     cli                   ; Clear Interrupt disable (i.e. listen for interrupt requests)
@@ -153,7 +137,7 @@ main:
 
     lda COM_BUF_START
     jsr print_hex_value
-    lda #" "
+    lda #' '
     jsr lcd_write_char
     jsr acia_send_char
 
@@ -168,7 +152,7 @@ main:
     jsr lcd_write_char
     jsr acia_send_char
 
-    lda #" "
+    lda #' '
     jsr lcd_write_char
     jsr acia_send_char
     lda COM_BUF_START
@@ -180,7 +164,7 @@ nl_char_detected:
     jsr acia_send_char
     lda #$0a
     jsr acia_send_char
-    lda #" "
+    lda #' '
     jsr lcd_write_char
     jmp main
 
@@ -245,7 +229,7 @@ execute_cli_cmd_print_buffer_loop:
 
     lda #(%10000000 | LCD_SECOND_LINE)
     jsr lcd_send_command
-    lda #">"
+    lda #'>'
     jsr lcd_write_char
 
     ldx COM_BUF_START
@@ -270,8 +254,6 @@ standard_interrupt:
     pha
     jsr acia_receive_char               ; Read char if available
     bcc return_from_standard_interrupt  ; Return if no char available
-    ;jsr lcd_write_char
-    ;jsr acia_send_char
     ldx COM_BUF_END
     sta COM_BUF,x                       ; Store received byte in the buffer.
     inc COM_BUF_END
@@ -348,7 +330,7 @@ ram_boot_data:
 ; ----- Strings & Tables -----------------
 ; ----------------------------------------
 string_standard_boot_mode:
-    .byte "== Iroko v0.4 ==", $00
+    .byte "== Iroko v0.5 ==", $00
 
 string_ram_boot_mode:
     .byte "RAM-boot mode", $00
@@ -357,105 +339,9 @@ table_byte_to_char:
     .byte "0123456789abcdef"
 
 ; ----------------------------------------
-; ----- Local Subroutines ----------------
-; ----------------------------------------
-acia_receive_char:                ; Reads a char from ACIA if there is one
-    clc
-    lda ACIA_STATUS
-    and #%00001000                ; Check if ReceiverDataRegisterFull
-    beq acia_receive_char_return  ; Move if ReceiverDataRegisterFull was not set
-    lda ACIA_DATA
-    sec
-acia_receive_char_return:
-    rts
-
-acia_send_char:
-    pha
-    txa
-    pha
-    tya
-    pha
-    lda ACIA_STATUS               ; For good measure
-    ldx #$ff
-    ldy #$03
-    jsr delay_x_y
-    pla
-    tay
-    pla
-    tax
-    pla
-    sta ACIA_DATA
-    rts
-
-send_string:
-    lda ($00, x)  ; Finds the address at top of the data stack and loads the accumulator with value from that address
-    cmp #$00
-    beq send_string_return
-    jsr acia_send_char
-    inc $00, x
-    bne send_string
-    inc $01, x
-    bne send_string
-send_string_return:
-    rts
-
-lcd_send_command:
-    jsr lcd_wait
-    sta PORTB
-    lda #0
-    sta PORTA
-    lda #E
-    sta PORTA
-    lda #0
-    sta PORTA
-    rts
-
-lcd_write_char:
-    jsr lcd_wait
-    sta PORTB
-    pha
-    lda #RS
-    sta PORTA
-    lda #(RS | E) ; Sending instruction by toggling E bit
-    sta PORTA
-    lda #RS
-    sta PORTA
-    pla
-    rts
-
-lcd_wait:
-    pha
-    lda #$00
-    sta DDRB
-lcd_wait_loop:
-    lda #RW
-    sta PORTA
-    lda #(RW | E)
-    sta PORTA
-    lda PORTB
-    and #%10000000        ; Check BusyFlag bit. Will set the Z flag if the result is zero, ie lcd is not busy
-    bne lcd_wait_loop
-
-    lda #RW
-    sta PORTA
-    lda #$ff
-    sta DDRB
-    pla
-    rts
-
-delay_x_y:
-delay_loop_x:
-    dex
-    bne delay_loop_x
-delay_loop_y:
-    dey
-    bne delay_loop_y
-    rts
-
-; ----------------------------------------
 ; ----- Common Subroutines ---------------
 ; ----------------------------------------
-    .org $e000
+    .segment "SUBROUTINES"
 
 print_string:
     lda ($00, x)  ; Finds the address at top of the data stack and loads the accumulator with value from that address
@@ -488,7 +374,7 @@ print_hex_value:
     tya
     pha
 
-    lda #"$"
+    lda #'$'
     jsr lcd_write_char
     jsr acia_send_char
 
@@ -519,10 +405,11 @@ print_hex_value:
     tax
     pla
     rts
+
 ; ----------------------------------------
 ; ----- Address Vectors ------------------
 ; ----------------------------------------
-    .org $fffa
+    .segment "VECTORS"
     .word interrupt
     .word reset
     .word non_maskable_interrupt

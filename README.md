@@ -1,5 +1,8 @@
 # README
 
+# CLI-magic
+http://www.climagic.org/mirrors/VT100_Escape_Codes.html
+
 # Connect to serial port on Linux
 tio -b 19200 /dev/ttyACM0
 
