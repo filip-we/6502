@@ -2,14 +2,23 @@
     .include "via1.s"
 
     .import __STACK_START__
+    ;.import __RAMPROG_LOAD__
 
 ; ----------------------------------------
-; ----- CONSTANTS & ADDRESSES ------------
+; ----- CONSTANTS ------------------------
+; ----------------------------------------
+COMMAND_RDRAM = $01
+COMMAND_WRRAM = $02
+COMMAND_BOOT = $ff
+
+; ----------------------------------------
+; ----- ADDRESSES ------------------------
 ; ----------------------------------------
 STACK = __STACK_START__
 
-RAM_BOOT_COMMAND_WRITE = $00
-RAM_BOOT_COMMAND_BOOT_NOW = $0f
+COMMAND = $00
+COMMAND_ADDRESS = $01
+;RAM_BOOT_COMMAND_BOOT_NOW = $0f
 
 ; Communication buffer
 COM_MODE =        $0200       ; 0=read/write to terminal
@@ -19,8 +28,8 @@ COM_PRINT_START = $0203
 COM_BUF =       $0300
 
 BOOT_MODE = $0210
-RAM_BOOT_COMMAND = $0211
-RAM_BOOT_ADDRESS = $0212
+;RAM_BOOT_COMMAND = $0211
+;RAM_BOOT_ADDRESS = $0212
 
     .segment "CODE"
 
@@ -37,6 +46,7 @@ RAM_BOOT_ADDRESS = $0212
 ; ----- Reset ----------------------------
 ; ----------------------------------------
 reset:
+    sei
     ldx #$ff                ; Initialize stack pointers for data and hardware stacks
     txs
     lda #$00                ; Initialize CLI-buffer pointer
@@ -79,13 +89,13 @@ reset:
     lda PORTA               ; Read Port A
     and #%00000001          ; Get least significant bit of Port A
     ;cmp #%00000000          ; Compare with 0
-    beq boot_mode_ram_write           ; Branch if result is zero (i.e. boot mode)
-    jmp boot_mode_standard
+    beq ram_boot_mode; Branch if result is zero (i.e. boot mode)
+    jmp standard_boot_mode
 
 ; ----------------------------------------
-; ----- RAM-write boot-mode --------------
+; ----- RAM-boot mode --------------------
 ; ----------------------------------------
-boot_mode_ram_write:
+ram_boot_mode:
     lda #$01
     sta BOOT_MODE                   ; RAM-write boot-mode is $01
     dex
@@ -97,17 +107,20 @@ boot_mode_ram_write:
     jsr print_string
     inx                             ; Free up data stack
     inx
-
-ram_boot_loop:
-    jmp ram_boot_loop
-    cmp RAM_BOOT_COMMAND_BOOT_NOW
-    bne ram_boot_loop
+    cli
+    ;jmp RAMPROG
     jmp $1000
+
+;ram_boot_loop:
+;    jmp ram_boot_loop
+;    cmp RAM_BOOT_COMMAND_BOOT_NOW
+;    bne ram_boot_loop
+;    jmp $1000
 
 ; ----------------------------------------
 ; ----- Normal boot-mode -----------------
 ; ----------------------------------------
-boot_mode_standard:
+standard_boot_mode:
     dex
     dex
     lda #>string_standard_boot_mode ; High byte
@@ -123,41 +136,80 @@ boot_mode_standard:
     lda #'>'
     jsr lcd_write_char
     jsr acia_send_char
-    cli                   ; Clear Interrupt disable (i.e. listen for interrupt requests)
+    lda #$00                        ; Initialize communication counter
+    tay
+    cli                             ; Clear Interrupt disable (i.e. listen for interrupt requests)
 
 main:
     lda COM_BUF_START
     cmp COM_BUF_END
-    bpl main                ; Branch if COM_BUF_START >= COM_BUF_END
+    bpl main                        ; Branch if COM_BUF_START >= COM_BUF_END
 
-    lda #%00000001
-    jsr lcd_send_command
-    lda #%00000010
-    jsr lcd_send_command
+    ; y=0: store byte in COMMAND_ADDRESS
+    ; 0<y<=2: store byte in COMMAND
+    ; y>3:  store byte in memory COMMAND_ADDRESS, y
+    tya
+    cmp #$00
+    beq main_store_command
+    cmp #$03
+    bmi main_store_address
+main_handle_data:
+    lda COMMAND
+    cmp #COMMAND_RDRAM
+    beq command_rdram
 
-    lda COM_BUF_START
-    jsr print_hex_value
-    lda #' '
+main_loop:
+    inc COM_BUF_START               ; Update COM_BUF_START
+    iny
+    cmp #$12
+    bmi main
+    lda #$00                        ; If y > 12 we roll around to #$00
+    tay
+    jmp main
+
+main_store_command:
+    lda #%00000001        ; Clear display
+    jsr lcd_send_command
+    lda #%00000010        ; Return cursor home
+    jsr lcd_send_command
+    lda #'C'
     jsr lcd_write_char
-    jsr acia_send_char
+    lda #'M'
+    jsr lcd_write_char
+    lda #'D'
+    jsr lcd_write_char
+    lda #':'
+    jsr lcd_write_char
 
     lda COM_BUF_START
     tax
     lda COM_BUF, x
-    inc COM_BUF_START
-    cmp #$0d                ; Ignore CR
-    beq main
-    cmp #$0a
-    beq nl_char_detected
-    jsr lcd_write_char
-    jsr acia_send_char
-
-    lda #' '
-    jsr lcd_write_char
-    jsr acia_send_char
-    lda COM_BUF_START
+    sta COMMAND
     jsr print_hex_value
-    jmp main
+    lda #'@'
+    jsr lcd_write_char
+    jmp main_loop
+
+main_store_address:
+    dey                             ; y is either 1 or 2, but offset should be 0 or 1
+    lda COM_BUF_START
+    tax
+    lda COM_BUF, x
+    sta COMMAND_ADDRESS, y          ; Store acc in COMMAND_ADDRESS + y - #$01 (Does this work on ZP?)
+    jsr print_hex_value
+    iny
+    jmp main_loop
+
+command_rdram:
+    lda #(%10000000 | LCD_SECOND_LINE)
+    jsr lcd_send_command
+
+    lda #$00
+    tax
+    lda (COMMAND_ADDRESS, x)
+    jsr print_hex_value
+    jsr acia_send_char
+    jmp main_loop
 
 nl_char_detected:
     lda #$0d
@@ -243,13 +295,14 @@ interrupt:
     rti
 
 non_maskable_interrupt:
+    sei
     pha
     txa
     pha
-    lda BOOT_MODE                       ; Check if we are in RAM-boot mode
-    cmp #$01
-    beq ram_boot_interrupt
-standard_interrupt:
+    ;lda BOOT_MODE                       ; Check if we are in RAM-boot mode
+    ;cmp #$01
+    ;beq ram_boot_interrupt
+;standard_interrupt:
     tya
     pha
     jsr acia_receive_char               ; Read char if available
@@ -263,68 +316,70 @@ return_from_standard_interrupt:
     pla
     tax
     pla
+    cli
     rti
 
-return_from_ram_boot_interrupt:
-    iny
-    cmp #$12                    ; Reset y if y > 12
-    bmi return_from_ram_boot_interrupt_no_overflow
-    lda #$00
-    tay
-return_from_ram_boot_interrupt_no_overflow:
-    pla
-    tax
-    pla
-    rti
+;return_from_ram_boot_interrupt:
+;    iny
+;    cmp #$12                    ; Reset y if y > 12
+;    bmi return_from_ram_boot_interrupt_no_overflow
+;    lda #$00
+;    tay
+;return_from_ram_boot_interrupt_no_overflow:
+;    pla
+;    tax
+;    pla
+;    cli
+;    rti
 
 ; Read three incomming bytes as an instruction.
 ; Instruction: "page write", "boot/done" or "unknown"
 ; We send the bytes in the order they are saved in the memory, staring at $00
-ram_boot_interrupt:
-    jsr acia_receive_char       ; Read char if available
-    bcc return_from_ram_boot_interrupt ; Return if no char available
-    pha
-    tya                         ; y stores the counter for the data
-
-    ;cmp #$01
-    ;bmi ram_boot_command        ; First byte is the command
-    ;cmp #$02
-    ;bmi ram_boot_low_address    ; Second and third bytes are the address
-    ;cmp #$03
-    ;bmi ram_boot_high_address   ; Second and third bytes are the address
-    ;cmp #$14
-    ;bmi ram_boot_data           ; Third up to and including 13th byte is data
-
-    cmp #$12
-    bpl ram_boot_high_address   ; Branch if y >= $12
-    cmp #$11
-    bpl ram_boot_low_address    ; Branch if y = $11
-    cmp #$10
-    bpl ram_boot_command        ; Branch if y = $10
-    ; If we got this far y > $10
-    jmp ram_boot_data
-
-ram_boot_command:
-    pla
-    sta RAM_BOOT_COMMAND
-    jmp return_from_ram_boot_interrupt
-
-ram_boot_low_address:
-    pla
-    sta RAM_BOOT_ADDRESS
-    jmp return_from_ram_boot_interrupt
-
-ram_boot_high_address:
-    pla
-    sta RAM_BOOT_ADDRESS + 1
-    jmp return_from_ram_boot_interrupt
-
-ram_boot_data:
-    tya
-    tax                         ; x is not used in the boot interrupt
-    pla                         ; retreive the data from acc.
-    sta ($00, x)                ; (Store data in RAM_BOOT_ADDRESS + x)
-    jmp return_from_ram_boot_interrupt
+;ram_boot_interrupt:
+;    jsr acia_receive_char       ; Read char if available
+;    bcc return_from_ram_boot_interrupt ; Return if no char available
+;    pha
+;    tya                         ; y stores the counter for the data
+;
+;    ;cmp #$01
+;    ;bmi ram_boot_command        ; First byte is the command
+;    ;cmp #$02
+;    ;bmi ram_boot_low_address    ; Second and third bytes are the address
+;    ;cmp #$03
+;    ;bmi ram_boot_high_address   ; Second and third bytes are the address
+;    ;cmp #$14
+;    ;bmi ram_boot_data           ; Third up to and including 13th byte is data
+;
+;    cmp #$12
+;    bpl ram_boot_high_address   ; Branch if y >= $12
+;    cmp #$11
+;    bpl ram_boot_low_address    ; Branch if y = $11
+;    cmp #$10
+;    bpl ram_boot_command        ; Branch if y = $10
+;    ; If we got this far y > $10
+;    jmp ram_boot_data
+;
+;ram_boot_command:
+;    pla
+;    sta RAM_BOOT_COMMAND
+;    jmp return_from_ram_boot_interrupt
+;
+;ram_boot_low_address:
+;    pla
+;    sta RAM_BOOT_ADDRESS
+;    jmp return_from_ram_boot_interrupt
+;
+;ram_boot_high_address:
+;    pla
+;    sta RAM_BOOT_ADDRESS + 1
+;    jmp return_from_ram_boot_interrupt
+;
+;ram_boot_data:
+;    tya
+;    tax                         ; x is not used in the boot interrupt
+;    pla                         ; retreive the data from acc.
+;    sta ($00, x)                ; (Store data in RAM_BOOT_ADDRESS + x)
+;    jmp return_from_ram_boot_interrupt
 
 ; ----------------------------------------
 ; ----- Strings & Tables -----------------
@@ -333,7 +388,7 @@ string_standard_boot_mode:
     .byte "== Iroko v0.5 ==", $00
 
 string_ram_boot_mode:
-    .byte "RAM-boot mode", $00
+    .byte "Booting from RAM", $00
 
 table_byte_to_char:
     .byte "0123456789abcdef"
@@ -376,7 +431,7 @@ print_hex_value:
 
     lda #'$'
     jsr lcd_write_char
-    jsr acia_send_char
+;    jsr acia_send_char
 
     tsx
     inx
@@ -390,14 +445,14 @@ print_hex_value:
     tay
     lda table_byte_to_char, y
     jsr lcd_write_char
-    jsr acia_send_char
+;    jsr acia_send_char
 
     lda STACK, x            ; Get back accumulator
     and #%00001111
     tay
     lda table_byte_to_char, y
     jsr lcd_write_char
-    jsr acia_send_char
+;    jsr acia_send_char
 
     pla
     tay
