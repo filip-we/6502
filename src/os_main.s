@@ -20,7 +20,8 @@ STACK = __STACK_START__
 
 COMMAND =             $00
 COMMAND_ADDRESS =     $01
-COMMAND_DATALEN =     $03
+COMMAND_DATALEN =     $03     ; 2 bytes
+
 PRINT_HEX_TO_ACIA =   $04
 TEMP =                $05
 TEMP_ADDRESS =        $06     ; 2 bytes
@@ -29,8 +30,9 @@ COM_BUF_START =     $0200
 COM_BUF_END =       $0201
 BOOT_MODE =         $0210
 
-COMMAND_DATA =      $0300
-COM_BUF =           $0400
+COM_BUF =           $0300
+
+COMMAND_DATA =      $0400
 
     .segment "CODE"
 
@@ -51,12 +53,13 @@ reset:
     cld                     ; Clear decimal flag (== integer mode)
     ldx #$ff                ; Initialize stack pointers for data and hardware stacks
     txs
-    lda #$00                ; Initialize CLI-buffer pointer
-    sta COM_BUF_START
-    sta COM_BUF_END
-
-    sta BOOT_MODE           ; Set boot mode to standard (=0)
-    sta PRINT_HEX_TO_ACIA
+    lda #$00
+    inx
+reset_loop:
+    dex
+    sta $00, x
+    sta $0200, x
+    bne reset_loop
 
 ; VIA setup
     lda #%11111111          ; Set all pins on port B to output
@@ -65,32 +68,30 @@ reset:
     sta DDRA
 
 ; LCD-display setup
-    lda #%00000001        ; Clear display
+    lda #%00000001          ; Clear display
     jsr lcd_send_command
-    lda #%00000010        ; Return cursor home
+    lda #%00000010          ; Return cursor home
     jsr lcd_send_command
-    lda #%00000110        ; Entry mode
+    lda #%00000110          ; Entry mode
     jsr lcd_send_command
-    lda #%00001111        ; Turning on display
+    lda #%00001111          ; Turning on display
     jsr lcd_send_command
-    lda #%00111000        ; Set to 8 bit mode, 1 line display, standard font
+    lda #%00111000          ; Set to 8 bit mode, 1 line display, standard font
     jsr lcd_send_command
 
 ; ACIA setup
 ;         ppmeTTRd
-    lda #%00001001        ;Odd parity, parity mode disabled, no echo, tx interrupt disabled, rx interrupt disabled
+    lda #%00001001          ;Odd parity, parity mode disabled, no echo, tx interrupt disabled, rx interrupt disabled
     sta ACIA_COMMAND
     lda #%00011111          ; No stop bit, 8 bit word, Baud-generator, 19,200 bit/s
     sta ACIA_CONTROL
 
-; Send clear-terminal command
     jsr send_clear_terminal_cmd
 
 ; Boot mode selection
     lda PORTA               ; Read Port A
     and #%00000001          ; Get least significant bit of Port A
-    ;cmp #%00000000          ; Compare with 0
-    beq ram_boot_mode; Branch if result is zero (i.e. boot mode)
+    beq ram_boot_mode       ; Branch if result is zero (i.e. boot mode)
     jmp standard_boot_mode
 
 ; ----------------------------------------
@@ -124,139 +125,85 @@ standard_boot_mode:
     ldy #$00
     jsr print_string
 
-    lda #(%10000000 | LCD_SECOND_LINE)
+    ;lda #(%10000000 | LCD_SECOND_LINE)
+    lda #%00000010                  ; Return cursor home
     jsr lcd_send_command
     lda #$00                        ; Initialize communication counter
     tay
     cli                             ; Clear Interrupt disable (i.e. listen for interrupt requests)
-    ldy #$00                        ; Count rows on LCD
+
 main:
+    jsr print_com_status
+    jsr send_mem_report
+main_loop:
     lda COM_BUF_START
     cmp COM_BUF_END
-    bpl main                        ; Branch if COM_BUF_START >= COM_BUF_END
+    bpl main_loop
+    jsr print_com_status
 
-    ; If LCD has 4 or more prints then we clear the display
-    cpy #$04
-    bmi main_print
-    ldy #$00
-    lda #%00000001                  ; Clear display
-    jsr lcd_send_command
-    lda #%00000010                  ; Return cursor home
-    jsr lcd_send_command
-main_print:
-    lda #'$'
-    jsr lcd_write_char
-    jsr acia_send_char
-    ldx COM_BUF_START
-    lda COM_BUF, x
-    sec
-    jsr print_hex_value
-    lda #' '
-    jsr lcd_write_char
-    jsr acia_send_char
-    inc COM_BUF_START
-    iny
+    jsr read_command
+    jsr print_com_status
+    jsr send_mem_report
+    jsr write_command
+
+    jsr print_com_status
+    jsr send_mem_report
     jmp main
 
-
-;    ; y=0: store byte in COMMAND_ADDRESS
-;    ; 0<y<=2: store byte in COMMAND
-;    ; y>3:  store byte in memory COMMAND_ADDRESS, y
-;    ;tya
-;    cpy #$00
-;    beq main_store_command
-;    cpy #$03
-;    bmi main_store_address
-;main_handle_data:
-;    lda COMMAND
-;    cmp #COMMAND_RDRAM
-;    beq command_rdram
-;
-;main_loop:
-;    inc COM_BUF_START               ; Update COM_BUF_START
-;    iny
-;    jsr main_print_status
-;    cpy #$13
-;    bmi main
-;    ldy #$00                        ; If y > 12 we roll around to #$00
-;    jsr main_print_status
-;    jmp main
-;
-;main_print_status:
-;; Print current command, address, and y
-;    lda #%00000001                  ; Clear display
-;    jsr lcd_send_command
-;    lda #%00000010                  ; Return cursor home
-;    jsr lcd_send_command
-;
-;    ; THIS IS THE PROBLEM! WE ARE SAVING DATA IN $0000 AND $0001!!! since we set x to be 00 at some point
-;    ldx #$80
-;    ;dex
-;    ;dex
-;    lda #>string_debug_command      ; High byte
-;    sta 1, x
-;    lda #<string_debug_command      ; Low byte
-;    sta 0, x
-;    jsr print_string_zp
-;    ;inx                             ; Free up data stack
-;    ;inx
-;    lda #(%10000000 | LCD_SECOND_LINE)
-;    jsr lcd_send_command
-;
-;    lda #'$'
-;    jsr lcd_write_char
-;    lda COMMAND
-;    jsr print_hex_value
-;    lda #' '
-;    jsr lcd_write_char
-;
-;    lda #'$'
-;    jsr lcd_write_char
-;    lda COMMAND_ADDRESS + 1
-;    jsr print_hex_value
-;    lda COMMAND_ADDRESS
-;    jsr print_hex_value
-;
-;    lda #'$'
-;    jsr lcd_write_char
-;    tya
-;    jsr print_hex_value
-;    rts
-;
-;main_store_command:
-;    ldx COM_BUF_START
-;    lda COM_BUF, x
-;    sta COMMAND
-;    jmp main_loop
-;
-;main_store_address:
-;    ;ldx COM_BUF_START
-;    ;lda COM_BUF, x
-;    ;dey                             ; y is either 1 or 2, but offset should be 0 or 1
-;    ;sta COMMAND_ADDRESS, y          ; Store acc in COMMAND_ADDRESS + y - #$01 (Does this work on ZP?)
-;    ;iny
-;    tya
-;    pha
-;    tax
-;    dex
-;    ldy COM_BUF_START
-;    lda COM_BUF, y
-;    sta COMMAND_ADDRESS, x
-;    pla
-;    tay
-;    jmp main_loop
-;
-;command_rdram:
 ;    ldx #$00
-;command_rdram_loop:
-;    lda (COMMAND_ADDRESS, x)
+;main_loop_2:
+;    lda COMMAND, x
 ;    jsr acia_send_char
 ;    inx
-;    cpx #$10
-;    bne command_rdram_loop
-;    ldy #$00                        ; Time for a new round
-;    jmp main_loop
+;    cpx #$03
+;    bne main_loop_2
+;    lda #$0d
+;    jsr acia_send_char
+;    lda #$0a
+;    jsr acia_send_char
 
+
+send_mem_report:
+    jsr send_clear_terminal_cmd
+    lda #'Z'
+    jsr acia_send_char
+    lda #'P'
+    jsr acia_send_char
+    lda #':'
+    jsr acia_send_char
+
+    ldx #$00
+send_mem_report_zp:
+    lda $00, x
+    jsr send_hex_value
+    lda #$20
+    jsr acia_send_char
+    inx
+    cpx #$10
+    bne send_mem_report_zp
+
+    lda #$0d
+    jsr acia_send_char
+    lda #$0a
+    jsr acia_send_char
+
+    lda #'B'
+    jsr acia_send_char
+    lda #'F'
+    jsr acia_send_char
+    lda #':'
+    jsr acia_send_char
+
+    ldx #$00
+send_mem_report_buffer:
+    lda COM_BUF, x
+    jsr send_hex_value
+    lda #$20
+    jsr acia_send_char
+    inx
+    cpx #$10
+    bne send_mem_report_buffer
+    rts
 
 ; ----------------------------------------
 ; ----- Interrupts -----------------------
@@ -269,13 +216,8 @@ non_maskable_interrupt:
     pha
     txa
     pha
-    ;lda BOOT_MODE                       ; Check if we are in RAM-boot mode
-    ;cmp #$01
-    ;beq ram_boot_interrupt
-;standard_interrupt:
     tya
     pha
-
     jsr acia_receive_char               ; Read char if available
     bcc return_from_standard_interrupt  ; Return if no char available
     ldx COM_BUF_END
@@ -302,61 +244,63 @@ string_ram_boot_mode:
 table_byte_to_char:
     .byte "0123456789abcdef"
 
-string_debug_command:
-    .byte "Cmd Addr  y", $00
-;         "$aa $abcd $01"
-
 ; ----------------------------------------
 ; ----- Subroutines ----------------------
 ; ----------------------------------------
     .segment "SUBROUTINES"
 
-; Protocol
-; CMD, ADDRx2, DLEN, DATA...
-; Length is 4 + d bytes
-
-; Start parsing new message if the buffer is >3 (and "CMDRDY"-flag is clear)
-; Put the CMD, ADDR and DLEN in variables
-; We continue to read all data (then we set "CMDRDY"-flag)
-
-; If CMDRDY is set we can take action on the message
-; (When we are done with the message we set the CMDRDY-flag to zero)
 read_command:
     pha
     txa
     pha
+read_command_wait_for_cmd:
     lda COM_BUF_END
     sec
     sbc COM_BUF_START
     sec
     sbc #PROTOCOL_HEADER_LEN
-    bmi read_command                    ; Branch if COM_BUF_START >= COM_BUF_END
-    ldx #PROTOCOL_HEADER_LEN - 1
-store_command:
-    lda COM_BUF_START, x
-    sta COMMAND, x
-    dex
-    bpl store_command
+    bmi read_command_wait_for_cmd       ; Seems to work in emulator
+    jsr print_com_status                ; Debug
     lda COM_BUF_START
+    clc
     adc #PROTOCOL_HEADER_LEN
     sta COM_BUF_START
-
-
-; Here we need to wait for all data bytes to arrive
-    lda COMMAND_DATALEN
-    beq read_command_return             ; Branch on zero
     tax
+    ldy #PROTOCOL_HEADER_LEN
+read_command_store_header:
     dex
-store_command_data:
-    lda COM_BUF_START, x
+    dey
+    lda COM_BUF, x
+    sta COMMAND, y
+    cpx #$00
+    bne read_command_store_header
+    jsr print_com_status                ; Debug
+read_command_wait_for_data:
+    lda COM_BUF_END
+    sec
+    sbc COM_BUF_START
+    sec
+    sbc COMMAND_DATALEN
+    bmi read_command_wait_for_data
+    jsr print_com_status                ; Debug
+    lda COM_BUF_START
+    clc
+    adc COMMAND_DATALEN
+    sta COM_BUF_START
+    tay
+    ldx COMMAND_DATALEN
+    beq read_command_return             ; Branch if COMMAND_DATALEN = 0
+    jsr print_com_status                ; Debug
+read_command_store_data:
+    dey
+    dex
+    lda COM_BUF, y
     sta COMMAND_DATA, x
-    dex
-    bpl store_command_data
+    bne read_command_store_data
 read_command_return:
     pla
     tax
     pla
-    sei                                 ; Debugging
     rts
 
 write_command:
@@ -385,6 +329,38 @@ write_command_return:
     pla
     rts
 
+print_com_status:
+    lda #LCD_CURSOR_HOME
+    jsr lcd_send_command
+
+    lda #'$'
+    jsr lcd_write_char
+    lda COM_BUF_START
+    clc                                 ;clear carry bit to not send to acia
+    jsr print_hex_value
+    lda #'$'
+    jsr lcd_write_char
+    lda COM_BUF_END
+    clc                                 ;clear carry bit to not send to acia
+    jsr print_hex_value
+    lda #' '
+    jsr lcd_write_char
+
+    lda #(%10000000 | LCD_SECOND_LINE)
+    jsr lcd_send_command
+    lda #'$'
+    jsr lcd_write_char
+    ldx #$00
+print_com_status_loop:
+    lda COMMAND, x
+    clc                                 ;clear carry bit to not send to acia
+    jsr print_hex_value
+    inx
+    cpx #$04
+    bne print_com_status_loop
+    lda #' '
+    jsr lcd_write_char
+    rts
 
 print_string:
 ; Prints a string whose pointer is located in address TEMP_ADDRESS. y is where to start printing. Currently uses both a, x and y
@@ -406,11 +382,19 @@ print_string_return:
 send_clear_terminal_cmd:
     lda #$1b
     jsr acia_send_char
-    lda #$5b
+    lda #'['
     jsr acia_send_char
-    lda #$32
+    lda #'2'
     jsr acia_send_char
-    lda #$4a
+    lda #'J'
+    jsr acia_send_char
+    lda #$1b
+    jsr acia_send_char
+    lda #'['
+    jsr acia_send_char
+    lda #';'
+    jsr acia_send_char
+    lda #'f'
     jsr acia_send_char
     rts
 
@@ -435,7 +419,7 @@ print_hex_value:
     jsr lcd_write_char
     ldy PRINT_HEX_TO_ACIA
     beq print_hex_value_no_acia_1   ; If carry bit is set we send to ACIA
-    jsr acia_send_char
+    ;jsr acia_send_char
 print_hex_value_no_acia_1:
     lda STACK, x                    ; Get back accumulator
     and #%00001111
@@ -444,8 +428,43 @@ print_hex_value_no_acia_1:
     jsr lcd_write_char
     ldy PRINT_HEX_TO_ACIA
     beq print_hex_value_no_acia_2   ; If carry bit is set we send to ACIA
-    jsr acia_send_char
+    ;jsr acia_send_char
+    sec
+    jmp print_hex_value_acia_2
 print_hex_value_no_acia_2:
+    clc                             ; Restore carry-bit
+print_hex_value_acia_2:
+    pla
+    tay
+    pla
+    tax
+    pla
+    rts
+
+send_hex_value:
+    pha
+    txa
+    pha
+    tya
+    pha
+    tsx
+    inx
+    inx
+    inx
+    lda STACK, x                    ; Get back accumulator
+    lsr
+    lsr
+    lsr
+    lsr
+    and #%00001111
+    tay
+    lda table_byte_to_char, y
+    jsr acia_send_char
+    lda STACK, x                    ; Get back accumulator
+    and #%00001111
+    tay
+    lda table_byte_to_char, y
+    jsr acia_send_char
     pla
     tay
     pla

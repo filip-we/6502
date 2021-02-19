@@ -1,19 +1,23 @@
 # README
 
+# Protocol
+Command (1 byte), Address (2 bytes), Data length (1 byte), Data (0 to theoretically 251 bytes)
+
 # CLI-magic
 http://www.climagic.org/mirrors/VT100_Escape_Codes.html
 
 # Connect to serial port on Linux
 tio -b 19200 /dev/ttyACM0
 
-# EEPROM
+# EEPROM-programmer
 I've changed wiring compared with Ben's programmer.
 
 # Compiling asm-code
-Compiler found here:
-http://www.compilers.de/vasm.html
-Run the exe with argument "-Fbin -dotdir".
-Show output with powershell's "Format-Hex a.out"
+Compiler found here: http://www.compilers.de/vasm.html
+Run the exe with argument "-Fbin -dotdir". Show output with powershell's "Format-Hex a.out"
+
+Now I use cc65 instead since it has more features.
+
 
 # RAM-boot mode
 RAM is between 0 and 3fff.
