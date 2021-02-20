@@ -16,7 +16,7 @@ def read_data(port):
         print(data)
 
 print("Opening port...")
-port = Serial(port="/dev/ttyACM0", baudrate=19200, timeout=1)
+port = Serial(port="/dev/ttyUSB0", baudrate=19200, timeout=1)
 i = 0
 while True:
     input("Start new message!")

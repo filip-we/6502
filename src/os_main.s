@@ -19,16 +19,16 @@ PROTOCOL_HEADER_LEN = $04
 STACK = __STACK_START__
 
 COMMAND =             $00
-COMMAND_ADDRESS =     $01
-COMMAND_DATALEN =     $03     ; 2 bytes
+COMMAND_ADDRESS =     COMMAND + $01     ; 2 bytes
+COMMAND_DATALEN =     COMMAND + $03
 
 PRINT_HEX_TO_ACIA =   $04
 TEMP =                $05
 TEMP_ADDRESS =        $06     ; 2 bytes
 
-COM_BUF_START =     $0200
-COM_BUF_END =       $0201
-BOOT_MODE =         $0210
+COM_BUF_START =       $08
+COM_BUF_END =         $09
+BOOT_MODE =           $0a
 
 COM_BUF =           $0300
 
@@ -143,7 +143,6 @@ main_loop:
 
     jsr read_command
     jsr print_com_status
-    jsr send_mem_report
     jsr write_command
 
     jsr print_com_status
@@ -186,7 +185,6 @@ send_mem_report_zp:
     jsr acia_send_char
     lda #$0a
     jsr acia_send_char
-
     lda #'B'
     jsr acia_send_char
     lda #'F'
@@ -260,7 +258,6 @@ read_command_wait_for_cmd:
     sec
     sbc #PROTOCOL_HEADER_LEN
     bmi read_command_wait_for_cmd       ; Seems to work in emulator
-    jsr print_com_status                ; Debug
     lda COM_BUF_START
     clc
     adc #PROTOCOL_HEADER_LEN
@@ -274,7 +271,6 @@ read_command_store_header:
     sta COMMAND, y
     cpx #$00
     bne read_command_store_header
-    jsr print_com_status                ; Debug
 read_command_wait_for_data:
     lda COM_BUF_END
     sec
@@ -282,20 +278,19 @@ read_command_wait_for_data:
     sec
     sbc COMMAND_DATALEN
     bmi read_command_wait_for_data
-    jsr print_com_status                ; Debug
     lda COM_BUF_START
     clc
     adc COMMAND_DATALEN
     sta COM_BUF_START
     tay
     ldx COMMAND_DATALEN
-    beq read_command_return             ; Branch if COMMAND_DATALEN = 0
-    jsr print_com_status                ; Debug
+    beq read_command_return
 read_command_store_data:
     dey
     dex
     lda COM_BUF, y
     sta COMMAND_DATA, x
+    cpx #$00
     bne read_command_store_data
 read_command_return:
     pla
@@ -312,7 +307,7 @@ write_command_to_acia:
     lda COMMAND, x
     jsr acia_send_char
     inx
-    cpx PROTOCOL_HEADER_LEN
+    cpx #PROTOCOL_HEADER_LEN
     bne write_command_to_acia
     lda COMMAND_DATALEN
     beq write_command_return
