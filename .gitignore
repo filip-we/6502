@@ -6,4 +6,5 @@ vasm6502_oldstyle
 /eeprom/filiprom.egg-info
 /cpu_code/compiler
 /datasheets
+/bin
 
