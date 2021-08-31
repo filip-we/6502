@@ -35,42 +35,8 @@ lda     absolute        Ad
 
 sta     absolute        8D
 
-# More custom stack
-; Put address of the array in the stack
-; Goto subroutine
-;   Read first byte
-;   Increase low byte by one.
-;   Check overflow: if yes inc high byte
-;   Loop
-
-lda #$01
-sta $0200
-lda #$03
-sta $0201
-lda #$04
-sta $0202
-
-lda #$10    ; Initialize stack-pointer
-tax
-
-lda #$02    ; Push array pointer to stack
-dex
-sta 0,x
-lda #$00
-dex
-sta 0,x
-
-lda #$00
-tay
-print_array:
-  lda ($00, x)  ; Load accumulator with value from an address found at ($00 + x)
-  sta $0300,y   ; Print
-  iny
-  inc $00, x    ; Increase low byte
-  bne print_array   ; Check overflow
-  inc $01, x
-
-
+/// August 2021
+To upload code with sixty/5o2 write `node Sender.js program.bin`
 
 /// January 2021
 Two types of interractions with the computer is desired:
