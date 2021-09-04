@@ -1,5 +1,10 @@
 # README
 
+# Usage with Sixty5o2
+To upload code with sixty/5o2 write `node Sender.js program.bin`
+
+The vector in the end of the ROM should be modified in order to use the interrupt in custom code. Let the maskable interrupt point to $0210 and put the code at $0210 in RAM.
+
 # Protocol
 Command (1 byte), Address (2 bytes), Data length (1 byte), Data (0 to theoretically 251 bytes)
 
@@ -35,8 +40,6 @@ lda     absolute        Ad
 
 sta     absolute        8D
 
-/// August 2021
-To upload code with sixty/5o2 write `node Sender.js program.bin`
 
 /// January 2021
 Two types of interractions with the computer is desired:
