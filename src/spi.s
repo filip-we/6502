@@ -9,7 +9,8 @@
     SPI_DATA = $1F00
 
     SPI_WRITE = $00
-    SPI_READ = $00
+    SPI_READ = $01
+    LCD_COUNT = $02
 
 string_s:
     .byte "=== SPI  ===", $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
@@ -47,6 +48,7 @@ start:
     lda $00
     sta SPI_WRITE
     sta SPI_READ
+    sta LCD_COUNT
 
 ; Print a string
     lda #'!'
@@ -54,22 +56,41 @@ start:
 ; Finishing reset
     cli                     ; Clear Interrupt disable (i.e. listen for interrupts)
 
+main_lcd_first_line:
+    lda #%00000010 | LCD_CLEAR_DISPLAY      ; Return cursor home
+    jsr lcd_send_command
+
+    lda #$00
+    sta LCD_COUNT
 
 main_loop:
     lda SPI_READ
     cmp SPI_WRITE
     bpl main_loop
 
+    lda #'$'
+    jsr lcd_write_char
+
     ldx SPI_READ
     lda SPI_DATA, x
     jsr print_hex_value
     inc SPI_READ
+    inc LCD_COUNT
 
     lda #' '
     jsr lcd_write_char
-    lda #'$'
-    jsr lcd_write_char
-    jsr print_hex_value
+
+    lda LCD_COUNT
+    cmp #$03
+    beq main_lcd_second_line
+    lda LCD_COUNT
+    cmp #$06
+    beq main_lcd_first_line
+    jmp main_loop               ; Else continue
+
+main_lcd_second_line:
+    lda #(%10000000 | LCD_SECOND_LINE)
+    jsr lcd_send_command
     jmp main_loop
 
 interrupt:
@@ -81,9 +102,6 @@ interrupt:
     lda IFR
     and #%00000100
     beq return_interrupt        ; Only caring about Shift Registers
-
-    lda #'i'
-    jsr lcd_write_char
 
     ldx SPI_WRITE
     lda SR
