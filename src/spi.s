@@ -10,6 +10,7 @@
     SPI_MOSI_PORT_BIT = %10000000
     SPI_MISO_PORT_BIT = %00000010
 
+    BOOT_LABEL = $03a0
 
 ; Variables in RAM
     SPI_MOSI_CURRENT_BIT = $00
@@ -23,6 +24,7 @@
 
     LCD_COUNT = $10
     temp = $11
+    RAM_ADDRESS = $12       ; 2 bytes long
 
     SPI_MOSI_DATA = $1F00
     SPI_MISO_DATA = $2000
@@ -41,7 +43,7 @@ start:
     sta ACR
     lda #%00000000          ; Set CB/CA-controls to input, negative active edge.
     sta PCR
-    lda #%10000011          ; Enable CA1 & 2
+    lda #%10000100          ; Enable SR Interrupt
     sta IER
     lda SR                  ; Clear content of SR
 
@@ -69,6 +71,12 @@ start:
     sta SPI_MISO_READ
 
     sta LCD_COUNT
+
+    lda $00                 ; Low address
+    sta RAM_ADDRESS
+    lda $06                 ; High address
+    sta RAM_ADDRESS + 1
+
     lda #'a'
     sta temp
 
@@ -83,45 +91,91 @@ start:
 ; Finishing reset
     cli                     ; Clear Interrupt disable (i.e. listen for interrupts)
 
-main_lcd_first_line:
+
+                            ; Count down until booting into $0200
+                            ; Poll IFR if data in SR
+                            ; When we have data in SR: Write data to current RAM address
+main_first:
+    lda #$ee
+    ldy #0
+    sta (RAM_ADDRESS), y
+    iny
+    sta (RAM_ADDRESS), y
+    iny
+    sta (RAM_ADDRESS), y
+    iny
+    sta (RAM_ADDRESS), y
+    iny
+    sta (RAM_ADDRESS), y
+    iny
+    sta (RAM_ADDRESS), y
+    
+    sta $05fa
+    sta $05fb
+    sta $05fc
+    sta $05fd
+    sta $05fe
+    sta $05ff
+
+    lda PORTA               ; Click button to enter RAM-load
+    and #%00010000          ; Checking rightmost button
+    beq fake_start          ; Button not pressed - is low - equal to 0
+    
     lda #%00000010 | LCD_CLEAR_DISPLAY      ; Return cursor home
     jsr lcd_send_command
+    lda #'W'
+    jsr lcd_write_char
+    lda #'a'
+    jsr lcd_write_char
+    lda #'i'
+    jsr lcd_write_char
+    lda #'t'
+    jsr lcd_write_char
+    lda #'i'
+    jsr lcd_write_char
+    lda #'n'
+    jsr lcd_write_char
+    lda #'g'
+    jsr lcd_write_char
 
-    lda #$00
-    sta LCD_COUNT
 
 main_loop:
-    jmp main_loop               ; Disable print to see IRQ behaviour
-    lda SPI_MOSI_READ
-    cmp SPI_MOSI_WRITE
-    bpl main_loop
+    lda IFR
+    and #%00000100
+    bne write_ram
+    jmp main_loop
 
+fake_start:
+    lda #%00000010 | LCD_CLEAR_DISPLAY      ; Return cursor home
+    jsr lcd_send_command
+    lda #'H'
+    jsr lcd_write_char
+
+inf:
+    jmp inf
+
+
+write_ram:
+    lda #%00000010 | LCD_CLEAR_DISPLAY      ; Return cursor home
+    jsr lcd_send_command
     lda #'$'
     jsr lcd_write_char
 
-    ldx SPI_MOSI_READ
-    lda SPI_MOSI_DATA, x
+    lda RAM_ADDRESS
     jsr print_hex_value
-    inc SPI_MOSI_READ
-    inc LCD_COUNT
-
-    lda #' '
-    jsr lcd_write_char
-
-    lda LCD_COUNT
-    cmp #$03
-    beq main_lcd_second_line
-    lda LCD_COUNT
-    cmp #$06
-    beq main_lcd_first_line
-    jmp main_loop               ; Else continue
-
-main_lcd_second_line:
-    lda #(%10000000 | LCD_SECOND_LINE)
-    jsr lcd_send_command
+    tay
+    lda SR
+    sta (RAM_ADDRESS), y
+    inc RAM_ADDRESS
+    bne main_loop
+    inc RAM_ADDRESS + 1
     jmp main_loop
 
+
 interrupt:
+    rti
+
+
     sei
     pha
     txa
