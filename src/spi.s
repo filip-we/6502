@@ -1,181 +1,26 @@
-;   Execution starting here! At first line!
-    .segment "CODE"
-    jmp start               ; Jump to main code
-    jmp interrupt           ; Jump to interrupt. 4 bytes in, at $0204
-
-;   Other stuff goes here
-   .include "via1.s"
+; This is work in progress and a bit of copy paste from other files
+   .import __ZP_START__
 
     SPI_PORT = PORTA
     SPI_MOSI_PORT_BIT = %10000000
     SPI_MISO_PORT_BIT = %00000010
 
-    BOOT_LABEL = $03a0
-
 ; Variables in RAM
-    SPI_MOSI_CURRENT_BIT = $00
-    SPI_MOSI_WRITE = $01
-    SPI_MOSI_READ = $02
-    SPI_MOSI_INCOMMING_BYTE = $03
+    SPI_MOSI_CURRENT_BIT    = __ZP_START__ + 0
+    SPI_MOSI_WRITE          = __ZP_START__ + 1
+    SPI_MOSI_READ           = __ZP_START__ + 2
+    SPI_MOSI_INCOMMING_BYTE = __ZP_START__ + 3
 
-    SPI_MISO_CURRENT_BIT = $05
-    SPI_MISO_WRITE = $06
-    SPI_MISO_READ = $07
+    SPI_MISO_CURRENT_BIT    = __ZP_START__ + 4
+    SPI_MISO_WRITE          = __ZP_START__ + 5
+    SPI_MISO_READ           = __ZP_START__ + 6
 
-    LCD_COUNT = $10
-    temp = $11
-    RAM_ADDRESS = $12       ; 2 bytes long
+    LCD_COUNT               = __ZP_START__ + 7
 
     SPI_MOSI_DATA = $1F00
     SPI_MISO_DATA = $2000
 
-
-
-start:
-    sei                     ; Set interrupt flag (== interrupts ignored)
-
-; VIA setup
-    lda #%11111110          ; Set PA0 to input, PA1 to PA7 to output
-    sta DDRA
-    lda #%11111111          ; Set all pins on port B to output
-    sta DDRB
-    lda #%00001100          ; Set Shift Register to shift in with external clock
-    sta ACR
-    lda #%00000000          ; Set CB/CA-controls to input, negative active edge.
-    sta PCR
-    lda #%10000100          ; Enable SR Interrupt
-    sta IER
-    lda SR                  ; Clear content of SR
-
-
-; LCD-display setup
-    lda #%00000001          ; Clear display
-    jsr lcd_send_command
-    lda #%00000010          ; Return cursor home
-    jsr lcd_send_command
-    lda #%00000110          ; Entry mode
-    jsr lcd_send_command
-    lda #%00001111          ; Turning on display
-    jsr lcd_send_command
-    lda #%00111000          ; Set to 8 bit mode, 1 line display, standard font
-    jsr lcd_send_command
-
-; Reset variables
-    lda $00
-    sta SPI_MOSI_CURRENT_BIT
-    sta SPI_MOSI_WRITE
-    sta SPI_MOSI_READ
-    sta SPI_MOSI_INCOMMING_BYTE
-    sta SPI_MISO_CURRENT_BIT
-    sta SPI_MISO_WRITE
-    sta SPI_MISO_READ
-
-    sta LCD_COUNT
-
-    lda $00                 ; Low address
-    sta RAM_ADDRESS
-    lda $06                 ; High address
-    sta RAM_ADDRESS + 1
-
-    lda #'a'
-    sta temp
-
-; Print a string
-    lda #'!'
-    jsr lcd_write_char
-
-; Prime MISO-buffer
-    lda #18
-    lda SPI_MISO_WRITE
-
-; Finishing reset
-    cli                     ; Clear Interrupt disable (i.e. listen for interrupts)
-
-
-                            ; Count down until booting into $0200
-                            ; Poll IFR if data in SR
-                            ; When we have data in SR: Write data to current RAM address
-main_first:
-    lda #$ee
-    ldy #0
-    sta (RAM_ADDRESS), y
-    iny
-    sta (RAM_ADDRESS), y
-    iny
-    sta (RAM_ADDRESS), y
-    iny
-    sta (RAM_ADDRESS), y
-    iny
-    sta (RAM_ADDRESS), y
-    iny
-    sta (RAM_ADDRESS), y
-    
-    sta $05fa
-    sta $05fb
-    sta $05fc
-    sta $05fd
-    sta $05fe
-    sta $05ff
-
-    lda PORTA               ; Click button to enter RAM-load
-    and #%00010000          ; Checking rightmost button
-    beq fake_start          ; Button not pressed - is low - equal to 0
-    
-    lda #%00000010 | LCD_CLEAR_DISPLAY      ; Return cursor home
-    jsr lcd_send_command
-    lda #'W'
-    jsr lcd_write_char
-    lda #'a'
-    jsr lcd_write_char
-    lda #'i'
-    jsr lcd_write_char
-    lda #'t'
-    jsr lcd_write_char
-    lda #'i'
-    jsr lcd_write_char
-    lda #'n'
-    jsr lcd_write_char
-    lda #'g'
-    jsr lcd_write_char
-
-
-main_loop:
-    lda IFR
-    and #%00000100
-    bne write_ram
-    jmp main_loop
-
-fake_start:
-    lda #%00000010 | LCD_CLEAR_DISPLAY      ; Return cursor home
-    jsr lcd_send_command
-    lda #'H'
-    jsr lcd_write_char
-
-inf:
-    jmp inf
-
-
-write_ram:
-    lda #%00000010 | LCD_CLEAR_DISPLAY      ; Return cursor home
-    jsr lcd_send_command
-    lda #'$'
-    jsr lcd_write_char
-
-    lda RAM_ADDRESS
-    jsr print_hex_value
-    tay
-    lda SR
-    sta (RAM_ADDRESS), y
-    inc RAM_ADDRESS
-    bne main_loop
-    inc RAM_ADDRESS + 1
-    jmp main_loop
-
-
 interrupt:
-    rti
-
-
     sei
     pha
     txa
