@@ -18,10 +18,11 @@ RW = %01000000
 RS = %00100000
 
 LCD_CLEAR_DISPLAY = %00000001
-LCD_CURSOR_HOME = %00000010
-LCD_SECOND_LINE = $40
+LCD_CURSOR_HOME   = %00000010
+LCD_DISPLAY_ON    = %00001111
+LCD_SECOND_LINE   = $40
 
-
+; ----------------------------------------------------------------
 lcd_command:
     jsr lcd_wait
     sta PORTB
@@ -33,6 +34,7 @@ lcd_command:
     sta PORTA
     rts
 
+; ----------------------------------------------------------------
 lcd_wait:
     pha
     lda #$00
@@ -53,10 +55,9 @@ lcd_wait_loop:
     pla
     rts
 
-table_hex_print:
-    .byte "0123456789abcdef"
-
+; ----------------------------------------------------------------
 ; Inspiration from the WOZ Monitor by Steve Wozniak
+; Destroys A
 lcd_print_hex_byte:
     pha
     lsr                             ; We print the MS-nibble first.
@@ -74,6 +75,7 @@ lcd_print_hex_char:
     clc                             ; Add offset to get to char a, b, etc. 
     adc #$27                        ; We jump from $3a...$3f to $61..$66
 
+; Non destructive
 lcd_print_char:
     jsr lcd_wait
     sta PORTB
@@ -87,37 +89,15 @@ lcd_print_char:
     pla
     rts
 
-
-
-print_hex_value:
-    pha
-    txa
-    pha
-    tya
-    pha
-    tsx
-    inx
-    inx
-    inx
-    lda __STACK_START__, x                    ; Get back accumulator
-    lsr
-    lsr
-    lsr
-    lsr                                       ; Get high address byte
-    and #%00001111                  ; Print only ascii-chars??
-    tay
-    lda table_hex_print, y
+; ----------------------------------------------------------------
+; Print a null-terminated string with an address pointer at ADDR_A
+; Destroys a, y
+lcd_print_string:
+    ldy #$00
+    lda (ADDR_A), y
+lcd_print_string_loop:
     jsr lcd_print_char
-
-    lda __STACK_START__, x                    ; Get back accumulator
-    and #%00001111
-    tay
-    lda table_hex_print, y
-    jsr lcd_print_char
-
-    pla
-    tay
-    pla
-    tax
-    pla
+    iny
+    lda (ADDR_A), y
+    bne lcd_print_string_loop   ; If a != $00 we continue
     rts
