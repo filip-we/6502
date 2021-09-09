@@ -8,3 +8,5 @@ vasm6502_oldstyle
 /datasheets
 /bin
 
+*/__pycache__
+
