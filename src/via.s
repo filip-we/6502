@@ -33,19 +33,6 @@ lcd_command:
     sta PORTA
     rts
 
-lcd_print_char:
-    jsr lcd_wait
-    sta PORTB
-    pha
-    lda #RS
-    sta PORTA
-    lda #(RS | E) ; Sending instruction by toggling E bit
-    sta PORTA
-    lda #RS
-    sta PORTA
-    pla
-    rts
-
 lcd_wait:
     pha
     lda #$00
@@ -68,6 +55,39 @@ lcd_wait_loop:
 
 table_hex_print:
     .byte "0123456789abcdef"
+
+; Inspiration from the WOZ Monitor by Steve Wozniak
+lcd_print_hex_byte:
+    pha
+    lsr                             ; We print the MS-nibble first.
+    lsr
+    lsr
+    lsr
+    jsr lcd_print_hex_char
+    pla
+
+lcd_print_hex_char:
+    and #%00001111                 ; Discard upper nibble
+    ora #'0'                        ; Adding offset to get to first char, #%0011.0000
+    cmp #'9' + 1                    ; If this is > 9 then add offset to a, b, c...
+    bmi lcd_print_char              ; If negative we can print the value of A
+    clc                             ; Add offset to get to char a, b, etc. 
+    adc #$27                        ; We jump from $3a...$3f to $61..$66
+
+lcd_print_char:
+    jsr lcd_wait
+    sta PORTB
+    pha
+    lda #RS
+    sta PORTA
+    lda #(RS | E) ; Sending instruction by toggling E bit
+    sta PORTA
+    lda #RS
+    sta PORTA
+    pla
+    rts
+
+
 
 print_hex_value:
     pha

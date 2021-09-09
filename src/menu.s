@@ -35,9 +35,16 @@ start:
 ; Print start message
     lda #'>'
     jsr lcd_print_char
+    lda #$ab
+    jsr lcd_print_hex_byte
+
+
 
 main_loop:
     jmp main_loop
 
 nmi:
     rti
+
+test_text:
+    .byte 1, 8, 15, 69, 200, 0
