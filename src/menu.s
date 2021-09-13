@@ -48,6 +48,13 @@ start:
 main_loop:
     jmp main_loop
 
+read_buttons:
+; Configure VIA to interrupt at regular intervals
+; On interrupt, read status of all buttons. 
+;   For each button: compare state with flag in memory location. if flag 1 and  button 1 increase counter. If states are opposite zero counter and set flag.
+;   Flag 1: Check if counter > 10: store key in keyboardbuffer. Reset counter.
+;   Flag 0: Check if counter > 100: store release key in keyboardbuffer. Reset counter.
+
 nmi:
     rti
 
