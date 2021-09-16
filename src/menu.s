@@ -15,13 +15,13 @@
     BUTTON_2        = ZP_START + $21
     BUTTON_3        = ZP_START + $22
 
-    KB_BUFF_WRITE   = ZP_START + $2a
-    KB_BUFF_READ    = ZP_START + $2a
+    KB_BUFF_WRITE   = ZP_START + $d0
+    KB_BUFF_READ    = ZP_START + $d1
 
-    KB_BUFF         = $1200
+    KB_BUFF         = $0600
 
 ; Constants
-    KB_POLL         = $ffff
+    KB_POLL         = $0211
 
 start:
     sei
@@ -78,34 +78,30 @@ reset_kb:
 
 
 main_loop:
+    lda KB_BUFF_READ
+    cmp KB_BUFF_WRITE
+    bpl main_loop
+
+    ldx KB_BUFF_READ
+    lda KB_BUFF, x
+    inc KB_BUFF_READ
+    jsr lcd_print_char
     jmp main_loop
 
 read_buttons:
-; Configure VIA to interrupt at regular intervals
-; On interrupt, read status of all buttons. 
-;   For each button: compare state with flag in memory location.
-;   If Flag==1 and  button==1: increase counter.
-;   If Flag==1 and  button==0: reset counter.
-;   (If Flag==0 and  button==0: increase counter.)
-;   If Flag==0 and  button==1: reset counter.
-;   Flag 1: Check if counter > 10: store key in keyboardbuffer. Reset counter.
-;   (Flag 0: Check if counter > 100: store release key in keyboardbuffer. Reset counter.) Can be done later
-;
-;   Byte: flag, nnn nnnn
-;   Flag not needed now since we dont count non-button-presses
-;   Garth says: BIT puts bit 7's value in the N flag
     lda PORTA
     and #BUTTON_1_PIN
-    bne button_not_pressed          ; We don't care if the button is not pressed
+    beq button_not_pressed          ; We don't care if the button is not pressed
+
     inc BUTTON_1
-    lda #$f0
+    lda #$20
     cmp BUTTON_1
     bne button_return
+
     ldx KB_BUFF_WRITE
     lda #'A'
     sta KB_BUFF, x
     inc KB_BUFF_WRITE
-    jsr lcd_print_char
     rts
 
 button_not_pressed:
@@ -115,15 +111,13 @@ button_return:
     rts
 
 nmi:
-    ;jsr read_buttons
-    lda #'P'
-    jsr lcd_print_char
+    jsr read_buttons
     lda #<KB_POLL
-    ;sta T1C_L
     sta T1L_L
+    sta T1C_L
     lda #>KB_POLL
     sta T1C_H
-    ;sta T1L_H
+    sta T1L_H
     rti
 
 test_text:

@@ -42,6 +42,7 @@ lda     absolute        Ad
 
 sta     absolute        8D
 
+Tip about BIT: it effectively puts bit 7's value in the N flag.
 
 /// January 2021
 Two types of interractions with the computer is desired:
