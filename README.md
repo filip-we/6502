@@ -5,6 +5,8 @@ To upload code with sixty/5o2 write `node Sender.js program.bin`
 
 The vector in the end of the ROM should be modified in order to use the interrupt in custom code. Let the maskable interrupt point to $0210 and put the code at $0210 in RAM.
 
+Important note: You cannot keep the VIA connected to the NMI on the 6502 when you transfer data via the Arduino. I am yet not sure why it fails, but the data gets corrupted.
+
 # Protocol
 Command (1 byte), Address (2 bytes), Data length (1 byte), Data (0 to theoretically 251 bytes)
 

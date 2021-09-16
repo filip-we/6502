@@ -15,7 +15,13 @@
     BUTTON_2        = ZP_START + $21
     BUTTON_3        = ZP_START + $22
 
-    TEMP            = $0600
+    KB_BUFF_WRITE   = ZP_START + $2a
+    KB_BUFF_READ    = ZP_START + $2a
+
+    KB_BUFF         = $1200
+
+; Constants
+    KB_POLL         = $ffff
 
 start:
     sei
@@ -25,10 +31,18 @@ start:
     sta DDRA
     lda #%11111111          ; Set all pins on port B to output
     sta DDRB
-    lda #%00000000          ; Disable features not used
-    sta ACR
     lda #%00000000          ; Set CB/CA-controls to input, negative active edge.
-    sta PCR
+    sta PCR                 ; Load T1-counter
+    lda #%01000000          ; Enable T1 continous interrupts
+    sta ACR
+    lda #<KB_POLL
+    sta T1C_L
+    sta T1L_L
+    lda #>KB_POLL
+    sta T1C_H
+    sta T1L_H
+    lda #%11000000          ; Enable T1-interrupts
+    sta IER
 
 ;   LCD-display setup
     lda #LCD_CLEAR_DISPLAY
@@ -48,6 +62,12 @@ reset_loop:
     sta $00, x
     inx
     bne reset_loop
+
+    ldx #0
+reset_kb:
+    sta KB_BUFF, x
+    inx
+    bne reset_kb
 
 ; Print start message
     lda #<test_text         ; Low byte
@@ -81,16 +101,29 @@ read_buttons:
     lda #$f0
     cmp BUTTON_1
     bne button_return
-    ; Add to buffer and update pointer
+    ldx KB_BUFF_WRITE
+    lda #'A'
+    sta KB_BUFF, x
+    inc KB_BUFF_WRITE
+    jsr lcd_print_char
     rts
 
 button_not_pressed:
-    lda #0                          ;   We don't count how long the button is NOT pressed
+    lda #0                          ;   We don't count how long the button is NOT pressed. Just reset the counter.
     sta BUTTON_1
 button_return:
     rts
 
 nmi:
+    ;jsr read_buttons
+    lda #'P'
+    jsr lcd_print_char
+    lda #<KB_POLL
+    ;sta T1C_L
+    sta T1L_L
+    lda #>KB_POLL
+    sta T1C_H
+    ;sta T1L_H
     rti
 
 test_text:
