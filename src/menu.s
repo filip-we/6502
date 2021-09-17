@@ -21,28 +21,25 @@
     KB_BUFF         = $0600
 
 ; Constants
-    KB_POLL         = $0211
+    KB_POLL         = $0411
 
 start:
     sei
 
 ;   VIA setup
-    lda #%11111110          ; Set PA0 to input, PA1 to PA7 to output
+    lda #%11100000          ; Set PA0 to PA4 to input, PA5 to PA7 to output
     sta DDRA
     lda #%11111111          ; Set all pins on port B to output
     sta DDRB
     lda #%00000000          ; Set CB/CA-controls to input, negative active edge.
     sta PCR                 ; Load T1-counter
-    lda #%01000000          ; Enable T1 continous interrupts
+    lda #%11000000          ; Enable T1 continous interrupts
     sta ACR
     lda #<KB_POLL
-    sta T1C_L
     sta T1L_L
     lda #>KB_POLL
-    sta T1C_H
     sta T1L_H
-    lda #%11000000          ; Enable T1-interrupts
-    sta IER
+    sta T1C_H
 
 ;   LCD-display setup
     lda #LCD_CLEAR_DISPLAY
@@ -57,6 +54,7 @@ start:
     jsr lcd_command
 
 ; Reset variables
+    lda #0
     ldx ZP_START
 reset_loop:
     sta $00, x
@@ -64,7 +62,7 @@ reset_loop:
     bne reset_loop
 
     ldx #0
-reset_kb:
+reset_kb:                   ; For easier debugging
     sta KB_BUFF, x
     inx
     bne reset_kb
@@ -76,6 +74,11 @@ reset_kb:
     sta ADDR_A + 1
     jsr lcd_print_string
 
+; VIA, last setup
+    lda #%11000000          ; Enable T1-interrupts
+    sta IER
+    lda T1C_L               ; Clear Interrupt-bit
+; Reset stops here
 
 main_loop:
     lda KB_BUFF_READ
@@ -111,13 +114,20 @@ button_return:
     rts
 
 nmi:
+    pha
+    txa
+    pha
+    tya
+    pha
+
     jsr read_buttons
-    lda #<KB_POLL
-    sta T1L_L
-    sta T1C_L
-    lda #>KB_POLL
-    sta T1C_H
-    sta T1L_H
+    lda T1C_L                       ; Reset Interrupt-flag
+
+    pla
+    tay
+    pla
+    tax
+    pla
     rti
 
 test_text:
