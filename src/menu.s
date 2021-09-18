@@ -10,7 +10,6 @@
     ADDR_A          = ZP_START + $10
     ADDR_B          = ZP_START + $12
 
-
     BUTTON_1        = ZP_START + $20
     BUTTON_2        = ZP_START + $21
     BUTTON_3        = ZP_START + $22
@@ -21,25 +20,10 @@
     KB_BUFF         = $0600
 
 ; Constants
-    KB_POLL         = $0411
+    KB_POLL         = $0340
 
 start:
-    sei
-
-;   VIA setup
-    lda #%11100000          ; Set PA0 to PA4 to input, PA5 to PA7 to output
-    sta DDRA
-    lda #%11111111          ; Set all pins on port B to output
-    sta DDRB
-    lda #%00000000          ; Set CB/CA-controls to input, negative active edge.
-    sta PCR                 ; Load T1-counter
-    lda #%11000000          ; Enable T1 continous interrupts
-    sta ACR
-    lda #<KB_POLL
-    sta T1L_L
-    lda #>KB_POLL
-    sta T1L_H
-    sta T1C_H
+    sei                     ; Only needed since we get here from other code, not a hardware reset
 
 ;   LCD-display setup
     lda #LCD_CLEAR_DISPLAY
@@ -52,6 +36,26 @@ start:
     jsr lcd_command
     lda #LCD_DISPLAY_ON
     jsr lcd_command
+
+;   VIA setup
+    lda #%11100000          ; Set PA0 to PA4 to input, PA5 to PA7 to output
+    sta DDRA
+    lda #%11111111          ; Set all pins on port B to output
+    sta DDRB
+    lda #%00000000          ; Set CB/CA-controls to input, negative active edge.
+    sta PCR
+    lda #%01000000          ; Enable T1 continous interrupts without PB7-pulsing
+    sta ACR
+
+    lda #<KB_POLL           ; Load T1-counter
+    sta T1L_L
+    lda #>KB_POLL
+    sta T1L_H
+    sta T1C_H
+
+    lda T1C_L               ; Clear Interrupt-bit
+    lda #%11000000          ; Enable T1-interrupts
+    sta IER
 
 ; Reset variables
     lda #0
@@ -74,10 +78,6 @@ reset_kb:                   ; For easier debugging
     sta ADDR_A + 1
     jsr lcd_print_string
 
-; VIA, last setup
-    lda #%11000000          ; Enable T1-interrupts
-    sta IER
-    lda T1C_L               ; Clear Interrupt-bit
 ; Reset stops here
 
 main_loop:
