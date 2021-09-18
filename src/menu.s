@@ -6,16 +6,16 @@
 ;   ----------------------------------------------------------------
     .include "via.s"
 
+; Variables
     ZP_START        = $10
     ADDR_A          = ZP_START + $10
     ADDR_B          = ZP_START + $12
 
-    BUTTON_1        = ZP_START + $20
-    BUTTON_2        = ZP_START + $21
-    BUTTON_3        = ZP_START + $22
+    BUTTON_COUNTERS = ZP_START + $20        ; 4 bytes long
+    BUTTON_PIN_NR   = ZP_START + $2a
 
-    KB_BUFF_WRITE   = ZP_START + $d0
-    KB_BUFF_READ    = ZP_START + $d1
+    KB_BUFF_WRITE   = ZP_START + $30
+    KB_BUFF_READ    = ZP_START + $31
 
     KB_BUFF         = $0600
 
@@ -25,7 +25,7 @@
 start:
     sei                     ; Only needed since we get here from other code, not a hardware reset
 
-;   LCD-display setup
+; LCD-display setup
     lda #LCD_CLEAR_DISPLAY
     jsr lcd_command
     lda #LCD_CURSOR_HOME
@@ -37,7 +37,7 @@ start:
     lda #LCD_DISPLAY_ON
     jsr lcd_command
 
-;   VIA setup
+; VIA setup
     lda #%11100000          ; Set PA0 to PA4 to input, PA5 to PA7 to output
     sta DDRA
     lda #%11111111          ; Set all pins on port B to output
@@ -65,19 +65,12 @@ reset_loop:
     inx
     bne reset_loop
 
-    ldx #0
-reset_kb:                   ; For easier debugging
-    sta KB_BUFF, x
-    inx
-    bne reset_kb
-
 ; Print start message
     lda #<test_text         ; Low byte
     sta ADDR_A
     lda #>test_text         ; Low byte
     sta ADDR_A + 1
     jsr lcd_print_string
-
 ; Reset stops here
 
 main_loop:
@@ -92,24 +85,37 @@ main_loop:
     jmp main_loop
 
 read_buttons:
-    lda PORTA
-    and #BUTTON_1_PIN
+    ldx #5
+    lda #%00100000                  ; Buttons are at PBA1-PBA4
+    sta BUTTON_PIN_NR
+read_buttons_loop:
+    dex
+    lda BUTTON_PIN_NR
+    clc
+    ror
+    sta BUTTON_PIN_NR
+    txa
+    beq button_return
+
+    lda BUTTON_PIN_NR
+    and PORTA
     beq button_not_pressed          ; We don't care if the button is not pressed
 
-    inc BUTTON_1
-    lda #$20
-    cmp BUTTON_1
-    bne button_return
+    inc BUTTON_COUNTERS, x
+    lda BUTTON_COUNTERS, x
+    cmp #$20                        ; Count triggering threshold
+    bne read_buttons_loop
 
-    ldx KB_BUFF_WRITE
-    lda #'A'
-    sta KB_BUFF, x
+    ldy KB_BUFF_WRITE
+    lda char_map, x
+    sta KB_BUFF, y
     inc KB_BUFF_WRITE
-    rts
+    jmp read_buttons_loop
 
 button_not_pressed:
-    lda #0                          ;   We don't count how long the button is NOT pressed. Just reset the counter.
-    sta BUTTON_1
+    lda #0                          ; We don't count how long the button is NOT pressed. Just reset the counter.
+    sta BUTTON_COUNTERS, x
+    jmp read_buttons_loop
 button_return:
     rts
 
@@ -132,3 +138,6 @@ nmi:
 
 test_text:
     .byte "Hejsan!", $00
+
+char_map:
+    .byte 0, "UDLR", 0

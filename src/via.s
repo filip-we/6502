@@ -6,10 +6,11 @@ PORTA = __VIA_START__ + 1
 DDRB  = __VIA_START__ + 2
 DDRA  = __VIA_START__ + 3
 
-T1C_L = __VIA_START__ + $04      ; Timer 1 Low byte
-T1C_H = __VIA_START__ + $05      ; Timer 1 High byte
-T1L_L = __VIA_START__ + $06      ; Timer 1 Low byte
-T1L_H = __VIA_START__ + $07      ; Timer 1 High byte
+T1C_L = __VIA_START__ + $04      ; Timer 1 Counter Low byte
+T1C_H = __VIA_START__ + $05      ; Timer 1 Counter High byte
+T1L_L = __VIA_START__ + $06      ; Timer 1 Latch Low byte
+T1L_H = __VIA_START__ + $07      ; Timer 1 Latch High byte
+
 SR    = __VIA_START__ + $0A      ; Shift Register
 ACR   = __VIA_START__ + $0B      ; Auxiliary Control Register (T1 x2, T2 x2, Shift Register x3, Data Latch x2)
 PCR   = __VIA_START__ + $0C        ; Periferal Control Register
