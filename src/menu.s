@@ -1,8 +1,8 @@
 ;   ----------------------------------------------------------------
 ;   Execution starting here, at $0200!
     .segment "CODE"
-    jmp start               ; Jump to main code
-    jmp nmi                 ; Jump to NMI-handler. 'jmp' instruction 4 bytes in, at $0204
+    jmp start               ; Jump to main code. Instrction is 3 bytes long.
+    jmp nmi                 ; Jump to NMI-handler. Instruction is 3 bytes long and starts 3 bytes in, at $0203.
 ;   ----------------------------------------------------------------
     .include "via.s"
 
