@@ -2,7 +2,7 @@
 ;   Execution starting here, at $0200!
     .segment "CODE"
     jmp start               ; Jump to main code. Instrction is 3 bytes long.
-    jmp nmi                 ; Jump to NMI-handler. Instruction is 3 bytes long and starts 3 bytes in, at $0203.
+    jmp isr                 ; Jump to NMI-handler. Instruction is 3 bytes long and starts 3 bytes in, at $0203.
 ;   ----------------------------------------------------------------
     .include "via.s"
 
@@ -24,6 +24,12 @@
 
 start:
     sei                     ; Only needed since we get here from other code, not a hardware reset
+
+; IRQ setup
+    lda #<isr
+    sta $04
+    lda #>isr
+    sta $05
 
 ; LCD-display setup
     lda #LCD_CLEAR_DISPLAY
@@ -71,7 +77,8 @@ reset_loop:
     lda #>test_text         ; Low byte
     sta ADDR_A + 1
     jsr lcd_print_string
-; Reset stops here
+
+    cli                     ; Ready to receive interrupts
 
 main_loop:
     lda KB_BUFF_READ
@@ -119,7 +126,7 @@ button_not_pressed:
 button_return:
     rts
 
-nmi:
+isr:
     pha
     txa
     pha
