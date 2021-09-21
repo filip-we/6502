@@ -82,6 +82,28 @@ reset_loop:
 
     cli                     ; Ready to receive interrupts
 
+temp_main:
+    ldx #0
+temp_main_1:
+    ldy #0
+temp_main_2:
+    dey
+    bne temp_main_2
+    dex
+    bne temp_main_1
+
+    lda #LCD_CLEAR_DISPLAY
+    jsr lcd_command
+    lda #LCD_CURSOR_HOME
+    jsr lcd_command
+
+    lda #'$'
+    jsr lcd_print_char
+    lda pulse_counter
+    jsr lcd_print_hex_byte
+
+    jmp temp_main
+
 main_loop:
     lda KB_BUFF_READ
     cmp KB_BUFF_WRITE
