@@ -2,7 +2,7 @@
 ;   Execution starting here, at $0200!
     .segment "CODE"
     jmp start               ; Jump to main code. Instrction is 3 bytes long.
-    jmp isr                 ; Jump to NMI-handler. Instruction is 3 bytes long and starts 3 bytes in, at $0203.
+    jmp nmi                 ; Jump to NMI-handler. Instruction is 3 bytes long and starts 3 bytes in, at $0203.
 ;   ----------------------------------------------------------------
     .include "via.s"
 
@@ -17,6 +17,7 @@
     KB_BUFF_WRITE   = ZP_START + $30
     KB_BUFF_READ    = ZP_START + $31
 
+    pulse_counter   = $05ff
     KB_BUFF         = $0600
 
 ; Constants
@@ -24,24 +25,21 @@
 
 start:
     sei                     ; Only needed since we get here from other code, not a hardware reset
+; Reset variables
+    lda #0
+    ldx ZP_START
+reset_loop:
+    sta $00, x
+    inx
+    bne reset_loop
+
+    sta pulse_counter
 
 ; IRQ setup
     lda #<isr
     sta $04
     lda #>isr
     sta $05
-
-; LCD-display setup
-    lda #LCD_CLEAR_DISPLAY
-    jsr lcd_command
-    lda #LCD_CURSOR_HOME
-    jsr lcd_command
-    lda #%00000110              ; Entry mode
-    jsr lcd_command
-    lda #%00111000              ; Set to 8 bit mode, 1 line display, standard font
-    jsr lcd_command
-    lda #LCD_DISPLAY_ON
-    jsr lcd_command
 
 ; VIA setup
     lda #%11100000          ; Set PA0 to PA4 to input, PA5 to PA7 to output
@@ -63,13 +61,17 @@ start:
     lda #%11000000          ; Enable T1-interrupts
     sta IER
 
-; Reset variables
-    lda #0
-    ldx ZP_START
-reset_loop:
-    sta $00, x
-    inx
-    bne reset_loop
+; LCD-display setup
+    lda #LCD_CLEAR_DISPLAY
+    jsr lcd_command
+    lda #LCD_CURSOR_HOME
+    jsr lcd_command
+    lda #%00000110              ; Entry mode
+    jsr lcd_command
+    lda #%00111000              ; Set to 8 bit mode, 1 line display, standard font
+    jsr lcd_command
+    lda #LCD_DISPLAY_ON
+    jsr lcd_command
 
 ; Print start message
     lda #<test_text         ; Low byte
@@ -135,6 +137,22 @@ isr:
 
     jsr read_buttons
     lda T1C_L                       ; Reset Interrupt-flag
+
+    pla
+    tay
+    pla
+    tax
+    pla
+    rti
+
+nmi:
+    pha
+    txa
+    pha
+    tya
+    pha
+
+    inc pulse_counter
 
     pla
     tay
