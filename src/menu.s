@@ -17,6 +17,7 @@
     KB_BUFF_WRITE   = ZP_START + $30
     KB_BUFF_READ    = ZP_START + $31
 
+    pulse_counter   = $05ff
     KB_BUFF         = $0600
 
 ; Constants
@@ -32,6 +33,7 @@ reset_loop:
     inx
     bne reset_loop
 
+    sta pulse_counter
 
 ; IRQ setup
     lda #<isr
@@ -79,6 +81,28 @@ reset_loop:
     jsr lcd_print_string
 
     cli                     ; Ready to receive interrupts
+
+temp_main:
+    ldx #0
+temp_main_1:
+    ldy #0
+temp_main_2:
+    dey
+    bne temp_main_2
+    dex
+    bne temp_main_1
+
+    lda #LCD_CLEAR_DISPLAY
+    jsr lcd_command
+    lda #LCD_CURSOR_HOME
+    jsr lcd_command
+
+    lda #'$'
+    jsr lcd_print_char
+    lda pulse_counter
+    jsr lcd_print_hex_byte
+
+    jmp temp_main
 
 main_loop:
     lda KB_BUFF_READ
@@ -144,10 +168,23 @@ isr:
     rti
 
 nmi:
+    pha
+    txa
+    pha
+    tya
+    pha
+
+    inc pulse_counter
+
+    pla
+    tay
+    pla
+    tax
+    pla
     rti
 
 test_text:
     .byte "Hejsan!", $00
 
 char_map:
-    .byte 0, "UDLR", 0              ; We interpret the keys as Up, Down, Left and Right (with the initial letter respectively)
+    .byte 0, "UDLR", 0
