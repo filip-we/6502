@@ -36,9 +36,9 @@ reset_loop:
     sta pulse_counter
 
 ; IRQ setup
-    lda #<isr
+    lda #<temp_isr
     sta $04
-    lda #>isr
+    lda #>temp_isr
     sta $05
 
 ; VIA setup
@@ -58,7 +58,8 @@ reset_loop:
     sta T1C_H
 
     lda T1C_L               ; Clear Interrupt-bit
-    lda #%11000000          ; Enable T1-interrupts
+    ;lda #%11000010          ; Enable T1-interrupts and CA1
+    lda #%10000010          ; Enable CA1-interrupt
     sta IER
 
 ; LCD-display setup
@@ -83,7 +84,7 @@ reset_loop:
     cli                     ; Ready to receive interrupts
 
 temp_main:
-    ldx #0
+    ldx #64
 temp_main_1:
     ldy #0
 temp_main_2:
@@ -150,6 +151,16 @@ button_not_pressed:
 button_return:
     rts
 
+
+temp_isr:
+    pha
+
+    inc pulse_counter
+    lda PORTA                       ; Clear CA1-interrupt    
+
+    pla
+    rti
+
 isr:
     pha
     txa
@@ -157,9 +168,15 @@ isr:
     tya
     pha
 
-    jsr read_buttons
+    ;jsr read_buttons
     lda T1C_L                       ; Reset Interrupt-flag
 
+    lda IFR
+    and #%00000010                  ; Check CA1-interrupt
+    beq return_isr
+    inc pulse_counter
+    lda PORTA                       ; Clear CA1-interrupt
+return_isr:
     pla
     tay
     pla
@@ -168,19 +185,6 @@ isr:
     rti
 
 nmi:
-    pha
-    txa
-    pha
-    tya
-    pha
-
-    inc pulse_counter
-
-    pla
-    tay
-    pla
-    tax
-    pla
     rti
 
 test_text:
