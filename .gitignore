@@ -1,10 +1,9 @@
 *.swp
 a.out
 vasm6502_oldstyle
-/__pycache__
-/eeprom/filiprom/__pycache__
-/eeprom/filiprom.egg-info
-/cpu_code/compiler
+*/__pycache__
+tools/eeprom/filiprom/__pycache__
+tools/eeprom/filiprom.egg-info
 /datasheets
 /bin
 
