@@ -5,6 +5,7 @@
     jmp nmi                 ; Jump to NMI-handler. Instruction is 3 bytes long and starts 3 bytes in, at $0203.
 ;   ----------------------------------------------------------------
     .include "via.s"
+    .include "ps2_keyboard.s"
 
 ; Variables
     ZP_START        = $10
@@ -36,13 +37,15 @@ reset_loop:
     sta pulse_counter
 
 ; IRQ setup
-    lda #<temp_isr
+    lda #<isr
     sta $04
-    lda #>temp_isr
+    lda #>isr
     sta $05
 
 ; VIA setup
-    lda #%11100000          ; Set PA0 to PA4 to input, PA5 to PA7 to output
+    lda #%00000001          ; Disable shift-register output
+    sta PORTA
+    lda #%11100001          ; Set PA1 to PA4 to input, PA0, PA5 to PA7 to output
     sta DDRA
     lda #%11111111          ; Set all pins on port B to output
     sta DDRB
@@ -58,8 +61,7 @@ reset_loop:
     sta T1C_H
 
     lda T1C_L               ; Clear Interrupt-bit
-    ;lda #%11000010          ; Enable T1-interrupts and CA1
-    lda #%10000010          ; Enable CA1-interrupt
+    lda #%11000010          ; Enable T1-interrupts and CA1
     sta IER
 
 ; LCD-display setup
@@ -82,6 +84,7 @@ reset_loop:
     jsr lcd_print_string
 
     cli                     ; Ready to receive interrupts
+    jmp main_loop
 
 temp_main:
     ldx #64
@@ -103,7 +106,7 @@ temp_main_2:
     lda pulse_counter
     jsr lcd_print_hex_byte
 
-    jmp temp_main
+   jmp temp_main
 
 main_loop:
     lda KB_BUFF_READ
@@ -156,7 +159,7 @@ temp_isr:
     pha
 
     inc pulse_counter
-    lda PORTA                       ; Clear CA1-interrupt    
+    lda PORTA                       ; Clear CA1-interrupt
 
     pla
     rti
@@ -168,14 +171,15 @@ isr:
     tya
     pha
 
-    ;jsr read_buttons
+    jsr read_buttons
     lda T1C_L                       ; Reset Interrupt-flag
 
     lda IFR
     and #%00000010                  ; Check CA1-interrupt
     beq return_isr
-    inc pulse_counter
-    lda PORTA                       ; Clear CA1-interrupt
+
+    jsr read_scan_code
+    ;inc pulse_counter
 return_isr:
     pla
     tay
