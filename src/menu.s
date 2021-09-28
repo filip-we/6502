@@ -64,6 +64,9 @@ reset_loop:
     lda #%11000010          ; Enable T1-interrupts and CA1
     sta IER
 
+; VIA-2 setup
+    jsr setup_via_2
+
 ; LCD-display setup
     lda #LCD_CLEAR_DISPLAY
     jsr lcd_command
@@ -112,15 +115,9 @@ temp_main_2:
    jmp temp_main
 
 main_loop:
-    lda #0
-    sta $5001
-
     lda KB_BUFF_READ
     cmp KB_BUFF_WRITE
     bpl main_loop
-
-    lda #$ff
-    sta $5001
 
     ldx KB_BUFF_READ
     lda KB_BUFF, x
@@ -163,7 +160,6 @@ button_not_pressed:
 button_return:
     rts
 
-
 temp_isr:
     pha
 
@@ -180,7 +176,7 @@ isr:
     tya
     pha
 
-    jsr read_buttons
+    ;jsr read_buttons
     lda T1C_L                       ; Reset Interrupt-flag
 
     lda IFR
@@ -188,6 +184,7 @@ isr:
     beq return_isr
 
     jsr read_scan_code
+    lda PORTA                       ; Clear CA1-interrupt
     ;inc pulse_counter
 return_isr:
     pla

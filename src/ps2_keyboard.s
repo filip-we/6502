@@ -1,27 +1,24 @@
+.import __VIA_2_START__
+
+    PORTB_2         = __VIA_2_START__
+    PORTA_2         = __VIA_2_START__ + 1
+    DDRB_2          = __VIA_2_START__ + 2
+    DDRA_2          = __VIA_2_START__ + 3
+
+setup_via_2:
+    lda #$00
+    sta DDRA_2
+    lda #$00
+    sta DDRA_2
 
 read_scan_code:
-    lda DDRB                ; Reads a byte from port A.
-    pha                     ; Will restore the state of the DDR:s before returning.
-
-    lda #$00
-    sta DDRB
-    lda PORTA               ; Will clear CA1-interrupt
-    lda #$00
-    sta PORTA               ; Toggle output-enable for shift-registers
-
     lda KB_BUFF_WRITE
     tay
-    lda PORTB
+    lda PORTA_2             ; Will clear CA1-interrupt
     tax
     lda keymap, x
     sta KB_BUFF, y
     inc KB_BUFF_WRITE
-
-    lda #$01
-    sta PORTA               ; We do not want the shift-registers to interfer with the LCD
-
-    pla
-    sta DDRB
     rts
 
 ; Credit to Ben for this nice table
