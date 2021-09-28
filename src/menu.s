@@ -49,7 +49,7 @@ reset_loop:
     sta DDRA
     lda #%11111111          ; Set all pins on port B to output
     sta DDRB
-    lda #%00000000          ; Set CB/CA-controls to input, negative active edge.
+    lda #%00000001          ; Set CB/CA-controls to input, positive active edge.
     sta PCR
     lda #%01000000          ; Enable T1 continous interrupts without PB7-pulsing
     sta ACR
@@ -184,8 +184,7 @@ isr:
     beq return_isr
 
     jsr read_scan_code
-    lda PORTA                       ; Clear CA1-interrupt
-    ;inc pulse_counter
+    lda PORTA                       ; Clear CA1-interrupt, last thing to do
 return_isr:
     pla
     tay
