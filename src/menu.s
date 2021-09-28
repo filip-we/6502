@@ -83,6 +83,9 @@ reset_loop:
     sta ADDR_A + 1
     jsr lcd_print_string
 
+    lda #$ff
+    sta $5003
+
     cli                     ; Ready to receive interrupts
     jmp main_loop
 
@@ -109,9 +112,15 @@ temp_main_2:
    jmp temp_main
 
 main_loop:
+    lda #0
+    sta $5001
+
     lda KB_BUFF_READ
     cmp KB_BUFF_WRITE
     bpl main_loop
+
+    lda #$ff
+    sta $5001
 
     ldx KB_BUFF_READ
     lda KB_BUFF, x
