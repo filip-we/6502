@@ -29,7 +29,7 @@ BUTTON_3_PIN = 5
 LCD_CLEAR_DISPLAY = %00000001
 LCD_CURSOR_HOME   = %00000010
 LCD_DISPLAY_ON    = %00001111
-LCD_SECOND_LINE   = $40
+LCD_SECOND_LINE   = %11000000
 
 ; ----------------------------------------------------------------
 lcd_command:

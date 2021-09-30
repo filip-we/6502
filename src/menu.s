@@ -17,9 +17,12 @@
 
     KB_BUFF_WRITE   = ZP_START + $30
     KB_BUFF_READ    = ZP_START + $31
+    LCD_BUFF_WRITE  = ZP_START + $32
+    LCD_BUFF_READ   = ZP_START + $33
 
     pulse_counter   = $05ff
     KB_BUFF         = $0600
+    LCD_BUFF        = $1000                 ; 2x16 bytes, ending at $100f
 
 ; Constants
     KB_POLL         = $0340
@@ -35,6 +38,13 @@ reset_loop:
     bne reset_loop
 
     sta pulse_counter
+
+    ldx #33
+lcd_ram_init:
+    dex
+    lda welcome_msg, x
+    sta LCD_BUFF, x
+    bne lcd_ram_init
 
 ; IRQ setup
     lda #<isr
@@ -80,11 +90,14 @@ reset_loop:
     jsr lcd_command
 
 ; Print start message
-    lda #<test_text         ; Low byte
-    sta ADDR_A
-    lda #>test_text         ; Low byte
-    sta ADDR_A + 1
-    jsr lcd_print_string
+    jsr update_lcd
+;    lda #<test_text         ; Low byte
+;    sta ADDR_A
+;    lda #>test_text         ; Low byte
+;    sta ADDR_A + 1
+;    jsr lcd_print_string
+    lda #LCD_SECOND_LINE
+    jsr lcd_command
 
     lda #$ff
     sta $5003
@@ -160,6 +173,28 @@ button_not_pressed:
 button_return:
     rts
 
+update_lcd:                         ; Loop throug all 16 characters and print them
+    lda #LCD_CURSOR_HOME
+    jsr lcd_command
+
+    ldx #0
+update_lcd_loop:
+    lda LCD_BUFF, x
+    jsr lcd_print_char
+
+    inx
+    cpx #16
+    beq update_lcd_advance_line
+    cpx #32
+    bne update_lcd_loop
+    rts
+
+update_lcd_advance_line:
+    lda #LCD_SECOND_LINE
+    jsr lcd_command
+    jmp update_lcd_loop
+
+
 temp_isr:
     pha
 
@@ -198,6 +233,9 @@ nmi:
 
 test_text:
     .byte "Hejsan!", $00
+
+welcome_msg:
+    .byte "Halloj!         ", "                ", $00
 
 char_map:
     .byte 0, "UDLR", 0
