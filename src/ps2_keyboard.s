@@ -5,11 +5,18 @@
     DDRB_2          = __VIA_2_START__ + 2
     DDRA_2          = __VIA_2_START__ + 3
 
+    IFR_CA2         = %00000001
+    IFR_CA1         = %00000010
+    IFR_SR          = %00000100
+    IFR_CB2         = %00001000
+    IFR_CB1         = %00010000
+    IFR_T2          = %00100000
+    IFR_T1          = %01000000
+
 setup_via_2:
     lda #$00
     sta DDRA_2
-    lda #$00
-    sta DDRA_2
+    rts
 
 read_scan_code:
     lda KB_BUFF_WRITE

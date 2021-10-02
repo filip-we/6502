@@ -19,10 +19,11 @@
     KB_BUFF_READ    = ZP_START + $31
     LCD_BUFF_WRITE  = ZP_START + $32
     LCD_BUFF_READ   = ZP_START + $33
+    TEMP            = ZP_START + $34
 
     pulse_counter   = $05ff
-    KB_BUFF         = $0600
-    LCD_BUFF        = $1000                 ; 2x16 bytes, ending at $100f
+    KB_BUFF         = $1000                 ; $ff bytes long
+    LCD_BUFF        = $1100                 ; 2x16 bytes, ending at $110f
 
 ; Constants
     KB_POLL         = $0340
@@ -44,6 +45,7 @@ lcd_ram_init:
     dex
     lda welcome_msg, x
     sta LCD_BUFF, x
+    cpx #$00
     bne lcd_ram_init
 
 ; IRQ setup
@@ -52,7 +54,7 @@ lcd_ram_init:
     lda #>isr
     sta $05
 
-; VIA setup
+; VIA-1 setup
     lda #%00000001          ; Disable shift-register output
     sta PORTA
     lda #%11100001          ; Set PA1 to PA4 to input, PA0, PA5 to PA7 to output
@@ -74,9 +76,6 @@ lcd_ram_init:
     lda #%11000010          ; Enable T1-interrupts and CA1
     sta IER
 
-; VIA-2 setup
-    jsr setup_via_2
-
 ; LCD-display setup
     lda #LCD_CLEAR_DISPLAY
     jsr lcd_command
@@ -88,22 +87,13 @@ lcd_ram_init:
     jsr lcd_command
     lda #LCD_DISPLAY_ON
     jsr lcd_command
-
-; Print start message
     jsr update_lcd
-;    lda #<test_text         ; Low byte
-;    sta ADDR_A
-;    lda #>test_text         ; Low byte
-;    sta ADDR_A + 1
-;    jsr lcd_print_string
-    lda #LCD_SECOND_LINE
-    jsr lcd_command
 
-    lda #$ff
-    sta $5003
+; VIA-2 setup
+    jsr setup_via_2
 
     cli                     ; Ready to receive interrupts
-    jmp main_loop
+    jmp main
 
 temp_main:
     ldx #64
@@ -125,7 +115,20 @@ temp_main_2:
     lda pulse_counter
     jsr lcd_print_hex_byte
 
-   jmp temp_main
+    jmp temp_main
+
+main:
+;start_loop:
+;    lda KB_BUFF_READ        ; We want to keep the start message until user starts to type
+;    cmp KB_BUFF_WRITE
+;    bpl start_loop
+;    ldx #33
+;    lda #' '
+;start_clear_lcd:
+;    dex
+;    sta LCD_BUFF, x
+;    cpx #0
+;    bne start_clear_lcd
 
 main_loop:
     lda KB_BUFF_READ
@@ -135,7 +138,16 @@ main_loop:
     ldx KB_BUFF_READ
     lda KB_BUFF, x
     inc KB_BUFF_READ
-    jsr lcd_print_char
+
+    ldx LCD_BUFF_WRITE
+    sta LCD_BUFF, x
+    jsr update_lcd
+    inx
+    stx LCD_BUFF_WRITE
+    cpx #33
+    bne main_loop
+    lda #0
+    sta LCD_BUFF_WRITE
     jmp main_loop
 
 read_buttons:
@@ -173,7 +185,11 @@ button_not_pressed:
 button_return:
     rts
 
-update_lcd:                         ; Loop throug all 16 characters and print them
+update_lcd:                         ; Destructive on A
+    txa
+    pha
+    tya
+    pha
     lda #LCD_CURSOR_HOME
     jsr lcd_command
 
@@ -181,12 +197,15 @@ update_lcd:                         ; Loop throug all 16 characters and print th
 update_lcd_loop:
     lda LCD_BUFF, x
     jsr lcd_print_char
-
     inx
     cpx #16
     beq update_lcd_advance_line
     cpx #32
     bne update_lcd_loop
+    pla
+    tay
+    pla
+    tax
     rts
 
 update_lcd_advance_line:
@@ -211,15 +230,16 @@ isr:
     tya
     pha
 
-    ;jsr read_buttons
-    lda T1C_L                       ; Reset Interrupt-flag
-
     lda IFR
-    and #%00000010                  ; Check CA1-interrupt
-    beq return_isr
-
-    jsr read_scan_code
-    lda PORTA                       ; Clear CA1-interrupt, last thing to do
+    asl                             ; T1
+    bmi isr_T1
+    asl                             ; T2
+    asl                             ; CB1
+    asl                             ; CB2
+    asl                             ; SR
+    asl                             ; CA1
+    bmi isr_CA1
+    asl                             ; CA2
 return_isr:
     pla
     tay
@@ -228,6 +248,16 @@ return_isr:
     pla
     rti
 
+isr_T1:
+    jsr read_buttons
+    lda T1C_L                       ; Reset Interrupt-flag
+    jmp return_isr
+
+isr_CA1:
+    jsr read_scan_code
+    lda PORTA                       ; Clear CA1-interrupt, last thing to do
+    jmp return_isr
+
 nmi:
     rti
 
@@ -235,7 +265,7 @@ test_text:
     .byte "Hejsan!", $00
 
 welcome_msg:
-    .byte "Halloj!         ", "                ", $00
+    .byte "0123456789abcdef", "0123456789abcdef", $00
 
 char_map:
     .byte 0, "UDLR", 0
