@@ -230,6 +230,7 @@ isr:
     tya
     pha
 
+isr_ifr_check:
     lda IFR
     asl                             ; T1
     bmi isr_T1
@@ -251,12 +252,12 @@ return_isr:
 isr_T1:
     jsr read_buttons
     lda T1C_L                       ; Reset Interrupt-flag
-    jmp return_isr
+    jmp isr_ifr_check
 
 isr_CA1:
     jsr read_scan_code
     lda PORTA                       ; Clear CA1-interrupt, last thing to do
-    jmp return_isr
+    jmp isr_ifr_check
 
 nmi:
     rti
