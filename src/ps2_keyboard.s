@@ -24,6 +24,13 @@ VIA2_IFR_T2         = %00100000
 VIA2_IFR_T1         = %01000000
 
 read_scan_code:                 ; Destroys a, x, y.
+    lda #'$'
+    jsr lcd_print_char
+    lda VIA2_PORTA
+    jsr lcd_print_hex_byte
+    rts
+
+; Working example
     lda KB_BUFF_WRITE           ; Will clear any CA-interrupts!
     tay
     lda VIA2_PORTA              ; Clearing CA1-interrupt
