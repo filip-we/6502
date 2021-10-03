@@ -20,10 +20,11 @@
     LCD_BUFF_WRITE  = ZP_START + $32
     LCD_BUFF_READ   = ZP_START + $33
     TEMP            = ZP_START + $34
+    KB_FLAGS        = ZP_START + $35
+    LCD_BUFF        = ZP_START + $d0        ; 2x16 bytes, ending at $110f
 
     pulse_counter   = $05ff
-    KB_BUFF         = $1000                 ; $ff bytes long
-    LCD_BUFF        = $1100                 ; 2x16 bytes, ending at $110f
+    KB_BUFF         = $1200                 ; $ff bytes long
 
 ; Constants
     KB_POLL         = $0340
@@ -55,26 +56,33 @@ lcd_ram_init:
     sta $05
 
 ; VIA-1 setup
-    lda #%00000001          ; Disable shift-register output
-    sta PORTA
-    lda #%11100001          ; Set PA1 to PA4 to input, PA0, PA5 to PA7 to output
-    sta DDRA
-    lda #%11111111          ; Set all pins on port B to output
-    sta DDRB
-    lda #%00000001          ; Set CB/CA-controls to input, positive active edge.
-    sta PCR
-    lda #%01000000          ; Enable T1 continous interrupts without PB7-pulsing
-    sta ACR
+    lda #%00000001              ; Disable shift-register output
+    sta VIA1_PORTA
+    lda #%11100001              ; Set PA1 to PA4 to input, PA0, PA5 to PA7 to output
+    sta VIA1_DDRA
+    lda #%11111111              ; Set all pins on port B to output
+    sta VIA1_DDRB
+    lda #%00000001              ; Set CB/CA to input, positive active edge.
+    sta VIA1_PCR
+    lda #%01000000              ; Enable T1 continous interrupts without PB7-pulsing
+    sta VIA1_ACR
 
-    lda #<KB_POLL           ; Load T1-counter
-    sta T1L_L
+    lda #<KB_POLL               ; Load T1-counter
+    sta VIA1_T1L_L
     lda #>KB_POLL
-    sta T1L_H
-    sta T1C_H
+    sta VIA1_T1L_H
+    sta VIA1_T1C_H
+    lda VIA1_T1C_L              ; Clear Interrupt-bit
+    lda #%11000000              ; Enable T1-interrupts
+    sta VIA1_IER
 
-    lda T1C_L               ; Clear Interrupt-bit
-    lda #%11000010          ; Enable T1-interrupts and CA1
-    sta IER
+; VIA-2 setup
+    lda #$00                    ; The PS2-interface is connected to VIA2_PORTA
+    sta VIA2_DDRA
+    lda #%00000001              ; Set CB/CA to input, positive active edge.
+    sta VIA2_PCR
+    lda #%10000010              ; Enable CA1-interrupts
+    sta VIA2_IER
 
 ; LCD-display setup
     lda #LCD_CLEAR_DISPLAY
@@ -89,10 +97,7 @@ lcd_ram_init:
     jsr lcd_command
     jsr update_lcd
 
-; VIA-2 setup
-    jsr setup_via_2
-
-    cli                     ; Ready to receive interrupts
+    cli                         ; Ready to receive interrupts
     jmp main
 
 temp_main:
@@ -131,9 +136,12 @@ main:
 ;    bne start_clear_lcd
 
 main_loop:
+    sei
     lda KB_BUFF_READ
     cmp KB_BUFF_WRITE
+    cli
     bpl main_loop
+    sei
 
     ldx KB_BUFF_READ
     lda KB_BUFF, x
@@ -164,7 +172,7 @@ read_buttons_loop:
     beq button_return
 
     lda BUTTON_PIN_NR
-    and PORTA
+    and VIA1_PORTA
     beq button_not_pressed          ; We don't care if the button is not pressed
 
     inc BUTTON_COUNTERS, x
@@ -218,7 +226,7 @@ temp_isr:
     pha
 
     inc pulse_counter
-    lda PORTA                       ; Clear CA1-interrupt
+    lda VIA1_PORTA                       ; Clear CA1-interrupt
 
     pla
     rti
@@ -231,15 +239,24 @@ isr:
     pha
 
 isr_ifr_check:
-    lda IFR
+    lda VIA1_IFR                    ; Checking VIA1
     asl                             ; T1
-    bmi isr_T1
+    bmi isr_VIA1_T1
     asl                             ; T2
     asl                             ; CB1
     asl                             ; CB2
     asl                             ; SR
     asl                             ; CA1
-    bmi isr_CA1
+    asl                             ; CA2
+
+    lda VIA2_IFR                    ; Checking VIA2
+    asl                             ; T1
+    asl                             ; T2
+    asl                             ; CB1
+    asl                             ; CB2
+    asl                             ; SR
+    asl                             ; CA1
+    bmi isr_VIA2_CA1
     asl                             ; CA2
 return_isr:
     pla
@@ -249,14 +266,13 @@ return_isr:
     pla
     rti
 
-isr_T1:
+isr_VIA1_T1:
     jsr read_buttons
-    lda T1C_L                       ; Reset Interrupt-flag
+    lda VIA1_T1C_L                       ; Reset Interrupt-flag
     jmp isr_ifr_check
 
-isr_CA1:
+isr_VIA2_CA1:
     jsr read_scan_code
-    lda PORTA                       ; Clear CA1-interrupt, last thing to do
     jmp isr_ifr_check
 
 nmi:
