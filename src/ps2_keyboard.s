@@ -39,12 +39,12 @@ read_scan_code_poll:
     lda VIA2_PORTA                          ; We have failed and need to clear the interrupt,
     rts                                     ; and need to return.
 
-read_scan_code_verified:
-    lda #'$'
-    jsr lcd_print_char
-    lda VIA2_PORTA
-    jsr lcd_print_hex_byte
-    rts
+;read_scan_code_verified:
+    ;lda #'$'
+    ;jsr lcd_print_char
+    ;lda VIA2_PORTA
+    ;jsr lcd_print_hex_byte
+    ;rts
 
 
 ; Working example
@@ -57,11 +57,17 @@ read_scan_code_verified:
     inc KB_BUFF_WRITE
     rts
 
-read_scan_code_properly:
+read_scan_code_verified:
     lda VIA2_PORTA
     cmp #$f0
-    beq read_scan_code_properly_return
+    pha
+    beq read_scan_code_release
 
+    lda KB_FLAGS
+    cmp #$01
+    beq read_scan_code_release_finished
+
+    pla
     tax
     lda KB_BUFF_WRITE
     tay
@@ -70,6 +76,19 @@ read_scan_code_properly:
     inc KB_BUFF_WRITE
 read_scan_code_properly_return:
     rts
+
+read_scan_code_release_finished:
+    pla
+    lda #$00
+    sta KB_FLAGS
+    rts
+
+read_scan_code_release:
+    pla
+    lda #$01
+    sta KB_FLAGS
+    rts
+
 
 ; Credit to Ben for this nice table
 keymap:
