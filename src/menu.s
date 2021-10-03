@@ -78,11 +78,15 @@ lcd_ram_init:
 
 ; VIA-2 setup
     lda #$00                    ; The PS2-interface is connected to VIA2_PORTA
-    sta VIA2_DDRA
+    sta VIA2_DDRA               ;
+    lda #( ^ VIA2_PS2_PORTB_CTL | %10000000)
+    sta VIA2_DDRB               ;
     lda #%00000001              ; Set CB/CA to input, positive active edge.
-    sta VIA2_PCR
+    sta VIA2_PCR                ;
     lda #%10000010              ; Enable CA1-interrupts
     sta VIA2_IER
+    lda #%10000000              ; Light a litte nice debugging-LED
+    sta VIA2_PORTB
 
 ; LCD-display setup
     lda #LCD_CLEAR_DISPLAY

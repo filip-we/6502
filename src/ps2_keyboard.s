@@ -23,17 +23,34 @@ VIA2_IFR_CB1        = %00010000
 VIA2_IFR_T2         = %00100000
 VIA2_IFR_T1         = %01000000
 
-read_scan_code:                 ; Destroys a, x, y.
+VIA2_PS2_PORTB_CTL  = %00000111             ; Stop-, parity- and start-bit
+PS2_CTL_MASK        = %00000101             ; Ignore parity for now.
+PS2_CTL_CMP         = %00000100             ; Stop bit should be 1, parity ignored, startbit 0
+
+read_scan_code:                             ; Destroys a, x, y.
+    ldx #$ff
+read_scan_code_poll:
+    lda VIA2_PORTB                          ; We want to check the control-bits first.
+    and #PS2_CTL_MASK                  ;
+    cmp #PS2_CTL_CMP                        ;
+    beq read_scan_code_verified             ;
+    dex
+    bne read_scan_code_poll
+    lda VIA2_PORTA                          ; We have failed and need to clear the interrupt,
+    rts                                     ; and need to return.
+
+read_scan_code_verified:
     lda #'$'
     jsr lcd_print_char
     lda VIA2_PORTA
     jsr lcd_print_hex_byte
     rts
 
+
 ; Working example
-    lda KB_BUFF_WRITE           ; Will clear any CA-interrupts!
+    lda KB_BUFF_WRITE                       ; Will clear any CA-interrupts!
     tay
-    lda VIA2_PORTA              ; Clearing CA1-interrupt
+    lda VIA2_PORTA                          ; Clearing CA1-interrupt
     tax
     lda keymap, x
     sta KB_BUFF, y
