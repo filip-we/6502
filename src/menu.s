@@ -24,7 +24,7 @@
     LCD_BUFF        = ZP_START + $d0        ; 2x16 bytes, ending at $110f
 
     pulse_counter   = $05ff
-    KB_BUFF         = $1200                 ; $ff bytes long
+    KB_BUFF         = $2000                 ; $ff bytes long
 
 ; Constants
     KB_POLL         = $0340

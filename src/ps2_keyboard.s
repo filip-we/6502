@@ -27,6 +27,10 @@ VIA2_PS2_PORTB_CTL  = %00000111             ; Stop-, parity- and start-bit
 PS2_CTL_MASK        = %00000101             ; Ignore parity for now.
 PS2_CTL_CMP         = %00000100             ; Stop bit should be 1, parity ignored, startbit 0
 
+RELEASE_FLAG        = %00000001             ; Flags for keyboard status
+SHIFT_FLAG          = %00000010
+CTL_FLAG            = %00000010
+
 read_scan_code:                             ; Destroys a, x, y.
     ldx #$ff
 read_scan_code_poll:
@@ -39,58 +43,75 @@ read_scan_code_poll:
     lda VIA2_PORTA                          ; We have failed and need to clear the interrupt,
     rts                                     ; and need to return.
 
-;read_scan_code_verified:
-    ;lda #'$'
-    ;jsr lcd_print_char
-    ;lda VIA2_PORTA
-    ;jsr lcd_print_hex_byte
-    ;rts
+read_scan_code_verified:
+    lda KB_FLAGS
+    and #RELEASE_FLAG
+    beq read_key
 
+    lda KB_FLAGS                            ; If the releseflag was set we need to check
+    eor #RELEASE_FLAG                       ; if the modifiers where released.
+    sta KB_FLAGS
 
-; Working example
-    lda KB_BUFF_WRITE                       ; Will clear any CA-interrupts!
-    tay
-    lda VIA2_PORTA                          ; Clearing CA1-interrupt
-    tax
-    lda keymap, x
-    sta KB_BUFF, y
-    inc KB_BUFF_WRITE
+    lda VIA2_PORTA                          ; Clear interrupt
+    cmp #$12
+    beq shift_released
+    lda KB_FLAGS
+    cmp #$59
+    beq shift_released
+    lda KB_FLAGS                            ; If neither of the shifts where released,
+    rts                                     ; we don't care.
+
+shift_released:
+    lda KB_FLAGS
+    eor #SHIFT_FLAG
+    sta KB_FLAGS
     rts
 
-read_scan_code_verified:
+read_key:
     lda VIA2_PORTA
     cmp #$f0
-    pha
-    beq read_scan_code_release
+    beq set_release_flag
+    cmp #$12
+    beq shift_pressed
+    cmp #$59
+    beq shift_pressed                       ; If it was neither shift or $f0 we read the key.
 
+    tax
     lda KB_FLAGS
-    cmp #$01
-    beq read_scan_code_release_finished
+    and #SHIFT_FLAG
+    beq normal_key
 
-    pla
+    lda keymap, x
+normal_key:
+    lda keymap, x
+
     tax
     lda KB_BUFF_WRITE
     tay
-    lda keymap, x
+    txa
     sta KB_BUFF, y
     inc KB_BUFF_WRITE
-read_scan_code_properly_return:
     rts
 
-read_scan_code_release_finished:
-    pla
-    lda #$00
+set_release_flag:
+    lda KB_FLAGS
+    ora #RELEASE_FLAG
     sta KB_FLAGS
     rts
 
-read_scan_code_release:
-    pla
-    lda #$01
+shift_pressed:
+    lda KB_FLAGS
+    ora #SHIFT_FLAG
     sta KB_FLAGS
     rts
 
+ctrl_pressed:
+    lda KB_FLAGS
+    ora #CTL_FLAG
+    sta KB_FLAGS
+    rts
 
-; Credit to Ben for this nice table
+; Credit to Ben for these nice tabl
 keymap:
   .byte "????????????? `?" ; 00-0F
   .byte "?????q1???zsaw2?" ; 10-1F
@@ -107,4 +128,22 @@ keymap:
   .byte "????????????????" ; C0-CF
   .byte "????????????????" ; D0-DF
   .byte "????????????????" ; E0-EF
-  .byte "ö???????????????" ; F0-FF
+  .byte "????????????????" ; F0-FF
+
+;keymap_shifted:
+;  .byte "????????????? ~?" ; 00-0F
+;  .byte "?????Q!???ZSAW@?" ; 10-1F
+;  .byte "?CXDE#$?? VFTR%?" ; 20-2F
+;  .byte "?NBHGY^???MJU&*?" ; 30-3F
+;  .byte "?<KIO)(??>?L:P_?" ; 40-4F
+;  .byte "??'?{+?????}?|??" ; 50-5F
+;  .byte "?????????1?47???" ; 60-6F
+;  .byte "0.2568???+3-*9??" ; 70-7F
+;  .byte "????????????????" ; 80-8F
+;  .byte "????????????????" ; 90-9F
+;  .byte "????????????????" ; A0-AF
+;  .byte "????????????????" ; B0-BF
+;  .byte "????????????????" ; C0-CF
+;  .byte "????????????????" ; D0-DF
+;  .byte "????????????????" ; E0-EF
+;  .byte "????????????????" ; F0-FF
