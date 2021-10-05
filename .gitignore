@@ -4,6 +4,7 @@ vasm6502_oldstyle
 */__pycache__
 tools/eeprom/filiprom/__pycache__
 tools/eeprom/filiprom.egg-info
+/etc/map_file.txt
 /datasheets
 /bin
 

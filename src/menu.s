@@ -14,6 +14,7 @@
 
     BUTTON_COUNTERS = ZP_START + $20        ; 4 bytes long
     BUTTON_PIN_NR   = ZP_START + $2a
+    pulse_counter   = ZP_START + $2b
 
     KB_BUFF_WRITE   = ZP_START + $30
     KB_BUFF_READ    = ZP_START + $31
@@ -23,8 +24,7 @@
     KB_FLAGS        = ZP_START + $35
     LCD_BUFF        = ZP_START + $d0        ; 2x16 bytes, ending at $110f
 
-    pulse_counter   = $05ff
-    KB_BUFF         = $2000                 ; $ff bytes long
+    KB_BUFF         = $3e00                 ; $ff bytes long
 
 ; Constants
     KB_POLL         = $0340
