@@ -13,8 +13,8 @@
     addr_b          = ZP_START + $12
 
     button_counters = ZP_START + $20        ; 4 bytes long
-    button_pin_nr   = ZP_START + $2a
-    pulse_counter   = ZP_START + $2b
+    button_pin_nr   = ZP_START + $2A
+    pulse_counter   = ZP_START + $2B
 
     kb_buff_write   = ZP_START + $30
     kb_buff_read    = ZP_START + $31
@@ -22,7 +22,7 @@
     lcd_buff_read   = ZP_START + $33
     temp            = ZP_START + $34
     kb_flags        = ZP_START + $35
-    lcd_buff        = ZP_START + $d0        ; 2x16 bytes, ending at $110f
+    lcd_buff        = ZP_START + $D0        ; 2x16 bytes, ending at $110F
 
     kb_buff         = $3000                 ; $ff bytes long
 

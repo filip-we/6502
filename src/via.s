@@ -59,7 +59,7 @@ lcd_wait_loop:
 
     lda #RW
     sta VIA1_PORTA
-    lda #$ff
+    lda #$FF
     sta VIA1_DDRB
     pla
     rts
