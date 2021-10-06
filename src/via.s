@@ -103,10 +103,10 @@ lcd_print_char:
 ; Destroys a, y
 lcd_print_string:
     ldy #$00
-    lda (ADDR_A), y
+    lda (addr_a), y
 lcd_print_string_loop:
     jsr lcd_print_char
     iny
-    lda (ADDR_A), y
+    lda (addr_a), y
     bne lcd_print_string_loop   ; If a != $00 we continue
     rts

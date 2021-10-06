@@ -9,25 +9,25 @@
 
 ; Variables
     ZP_START        = $10
-    ADDR_A          = ZP_START + $10
-    ADDR_B          = ZP_START + $12
+    addr_a          = ZP_START + $10
+    addr_b          = ZP_START + $12
 
-    BUTTON_COUNTERS = ZP_START + $20        ; 4 bytes long
-    BUTTON_PIN_NR   = ZP_START + $2a
+    button_counters = ZP_START + $20        ; 4 bytes long
+    button_pin_nr   = ZP_START + $2a
     pulse_counter   = ZP_START + $2b
 
-    KB_BUFF_WRITE   = ZP_START + $30
-    KB_BUFF_READ    = ZP_START + $31
-    LCD_BUFF_WRITE  = ZP_START + $32
-    LCD_BUFF_READ   = ZP_START + $33
-    TEMP            = ZP_START + $34
-    KB_FLAGS        = ZP_START + $35
-    LCD_BUFF        = ZP_START + $d0        ; 2x16 bytes, ending at $110f
+    kb_buff_write   = ZP_START + $30
+    kb_buff_read    = ZP_START + $31
+    lcd_buff_write  = ZP_START + $32
+    lcd_buff_read   = ZP_START + $33
+    temp            = ZP_START + $34
+    kb_flags        = ZP_START + $35
+    lcd_buff        = ZP_START + $d0        ; 2x16 bytes, ending at $110f
 
-    KB_BUFF         = $3e00                 ; $ff bytes long
+    kb_buff         = $3000                 ; $ff bytes long
 
 ; Constants
-    KB_POLL         = $0340
+    kb_poll         = $0340
 
 start:
     sei                     ; Only needed since we get here from other code, not a hardware reset
@@ -45,7 +45,7 @@ reset_loop:
 lcd_ram_init:
     dex
     lda welcome_msg, x
-    sta LCD_BUFF, x
+    sta lcd_buff, x
     cpx #$00
     bne lcd_ram_init
 
@@ -67,9 +67,9 @@ lcd_ram_init:
     lda #%01000000              ; Enable T1 continous interrupts without PB7-pulsing
     sta VIA1_ACR
 
-    lda #<KB_POLL               ; Load T1-counter
+    lda #<kb_poll               ; Load T1-counter
     sta VIA1_T1L_L
-    lda #>KB_POLL
+    lda #>kb_poll
     sta VIA1_T1L_H
     sta VIA1_T1C_H
     lda VIA1_T1C_L              ; Clear Interrupt-bit
@@ -128,71 +128,71 @@ temp_main_2:
 
 main:
 ;start_loop:
-;    lda KB_BUFF_READ        ; We want to keep the start message until user starts to type
-;    cmp KB_BUFF_WRITE
+;    lda kb_buff_read        ; We want to keep the start message until user starts to type
+;    cmp kb_buff_write
 ;    bpl start_loop
 ;    ldx #33
 ;    lda #' '
 ;start_clear_lcd:
 ;    dex
-;    sta LCD_BUFF, x
+;    sta lcd_buff, x
 ;    cpx #0
 ;    bne start_clear_lcd
 
 main_loop:
     sei
-    lda KB_BUFF_READ
-    cmp KB_BUFF_WRITE
+    lda kb_buff_read
+    cmp kb_buff_write
     cli
     bpl main_loop
     sei
 
-    ldx KB_BUFF_READ
-    lda KB_BUFF, x
-    inc KB_BUFF_READ
+    ldx kb_buff_read
+    lda kb_buff, x
+    inc kb_buff_read
 
-    ldx LCD_BUFF_WRITE
-    sta LCD_BUFF, x
+    ldx lcd_buff_write
+    sta lcd_buff, x
     jsr update_lcd
     inx
-    stx LCD_BUFF_WRITE
+    stx lcd_buff_write
     cpx #33
     bne main_loop
     lda #0
-    sta LCD_BUFF_WRITE
+    sta lcd_buff_write
     jmp main_loop
 
 read_buttons:
     ldx #5
     lda #%00100000                  ; Buttons are at PBA1-PBA4
-    sta BUTTON_PIN_NR
+    sta button_pin_nr
 read_buttons_loop:
     dex
-    lda BUTTON_PIN_NR
+    lda button_pin_nr
     clc
     ror
-    sta BUTTON_PIN_NR
+    sta button_pin_nr
     txa
     beq button_return
 
-    lda BUTTON_PIN_NR
+    lda button_pin_nr
     and VIA1_PORTA
     beq button_not_pressed          ; We don't care if the button is not pressed
 
-    inc BUTTON_COUNTERS, x
-    lda BUTTON_COUNTERS, x
+    inc button_counters, x
+    lda button_counters, x
     cmp #$20                        ; Count triggering threshold
     bne read_buttons_loop
 
-    ldy KB_BUFF_WRITE
+    ldy kb_buff_write
     lda char_map, x
-    sta KB_BUFF, y
-    inc KB_BUFF_WRITE
+    sta kb_buff, y
+    inc kb_buff_write
     jmp read_buttons_loop
 
 button_not_pressed:
     lda #0                          ; We don't count how long the button is NOT pressed. Just reset the counter.
-    sta BUTTON_COUNTERS, x
+    sta button_counters, x
     jmp read_buttons_loop
 button_return:
     rts
@@ -207,7 +207,7 @@ update_lcd:                         ; Destructive on A
 
     ldx #0
 update_lcd_loop:
-    lda LCD_BUFF, x
+    lda lcd_buff, x
     jsr lcd_print_char
     inx
     cpx #16
