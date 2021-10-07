@@ -55,10 +55,8 @@ read_scan_code_verified:
     lda VIA2_PORTA                          ; Clear interrupt
     cmp #$12
     beq shift_released
-    lda kb_flags
     cmp #$59
-    beq shift_released
-    lda kb_flags                            ; If neither of the shifts where released,
+    beq shift_released                      ; If neither of the shifts where released,
     rts                                     ; we don't care.
 
 shift_released:
@@ -79,12 +77,10 @@ read_key:
     tax
     lda kb_flags
     and #SHIFT_FLAG
-    beq normal_key
+    bne load_shifted_key
 
     lda keymap, x
-normal_key:
-    lda keymap, x
-
+store_key:
     tax
     lda kb_buff_write
     tay
@@ -92,6 +88,10 @@ normal_key:
     sta kb_buff, y
     inc kb_buff_write
     rts
+
+load_shifted_key:
+    lda keymap_shifted, x
+    jmp store_key
 
 set_release_flag:
     lda kb_flags

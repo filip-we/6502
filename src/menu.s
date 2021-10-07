@@ -160,6 +160,10 @@ main_loop:
     lda kb_buff, x
     inc kb_buff_read
 
+    cmp #$03
+    beq clear_lcd
+
+push_char_to_lcd:
     ldx lcd_buff_write
     sta lcd_buff, x
     jsr update_lcd
@@ -169,6 +173,20 @@ main_loop:
     bne main_loop
     lda #0
     sta lcd_buff_write
+    jmp main_loop
+
+clear_lcd:
+    ldx #33
+    lda #$00
+clear_lcd_loop:
+    dex
+    sta lcd_buff, x
+    cpx #$00
+    bne clear_lcd_loop
+
+    sta lcd_buff_write
+    sta lcd_buff_read
+    jsr update_lcd
     jmp main_loop
 
 read_buttons:
