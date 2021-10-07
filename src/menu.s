@@ -1,39 +1,48 @@
 ;   ----------------------------------------------------------------
-;   Execution starting here, at $0200!
-    .segment "CODE"
-    jmp start               ; Jump to main code. Instrction is 3 bytes long.
-    jmp nmi                 ; Jump to NMI-handler. Instruction is 3 bytes long and starts 3 bytes in, at $0203.
+;   Imports & Constants
 ;   ----------------------------------------------------------------
-    .include "via.s"
-    .include "ps2_keyboard.s"
+.import __ZP_START__
 
-; Variables
-    ZP_START        = $10
-    addr_a          = ZP_START + $10
-    addr_b          = ZP_START + $12
+KB_POLL         = $0340
 
-    button_counters = ZP_START + $20        ; 4 bytes long
-    button_pin_nr   = ZP_START + $2A
-    pulse_counter   = ZP_START + $2B
+;   ----------------------------------------------------------------
+;   Zeropage, Startingvectors, Bufferts & Reset Vectors
+;   ----------------------------------------------------------------
+.segment "ZEROPAGE": zeropage
+.include "zeropage.s"
 
-    kb_buff_write   = ZP_START + $30
-    kb_buff_read    = ZP_START + $31
-    lcd_buff_write  = ZP_START + $32
-    lcd_buff_read   = ZP_START + $33
-    temp            = ZP_START + $34
-    kb_flags        = ZP_START + $35
-    lcd_buff        = ZP_START + $D0        ; 2x16 bytes, ending at $110F
+.segment "VECTORS"
+.byte $0000
+.byte $0000
+.byte $0000
 
-    kb_buff         = $3000                 ; $ff bytes long
+.segment "SIXTY5O2VECTORS"  ; Execution starts here, at $0200
+    jmp start               ; Jump to main code. Instrction is 3 bytes long.
+    jmp nmi                 ; Instruction is 3 bytes long and thus starts at $0203.
 
-; Constants
-    kb_poll         = $0340
+.segment "DATA"
+kb_buff:        .res $100
+lcd_buff:       .res 16
+
+welcome_msg:
+    .byte "Hejsan!         "
+    .byte "0123456789abcdef", $00
+
+char_map:
+    .byte $00, "UDLR", $00
+
+;   ----------------------------------------------------------------
+;   Code
+;   ----------------------------------------------------------------
+.segment "CODE"
+.include "via.s"
+.include "ps2_keyboard.s"
 
 start:
     sei                     ; Only needed since we get here from other code, not a hardware reset
 ; Reset variables
     lda #0
-    ldx ZP_START
+    ldx __ZP_START__
 reset_loop:
     sta $00, x
     inx
@@ -67,9 +76,9 @@ lcd_ram_init:
     lda #%01000000              ; Enable T1 continous interrupts without PB7-pulsing
     sta VIA1_ACR
 
-    lda #<kb_poll               ; Load T1-counter
+    lda #<KB_POLL               ; Load T1-counter
     sta VIA1_T1L_L
-    lda #>kb_poll
+    lda #>KB_POLL
     sta VIA1_T1L_H
     sta VIA1_T1C_H
     lda VIA1_T1C_L              ; Clear Interrupt-bit
@@ -282,11 +291,3 @@ isr_VIA2_CA1:
 nmi:
     rti
 
-test_text:
-    .byte "Hejsan!", $00
-
-welcome_msg:
-    .byte "0123456789abcdef", "0123456789abcdef", $00
-
-char_map:
-    .byte 0, "UDLR", 0
