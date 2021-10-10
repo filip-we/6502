@@ -28,8 +28,9 @@ PS2_CTL_MASK        = %00000101             ; Ignore parity for now.
 PS2_CTL_CMP         = %00000100             ; Stop bit should be 1, parity ignored, startbit 0
 
 RELEASE_FLAG        = %00000001             ; Flags for keyboard status
-SHIFT_FLAG          = %00000010
-CTL_FLAG            = %00000010
+EXTENDED_FLAG       = %00000010
+SHIFT_FLAG          = %00000100
+CTRL_FLAG           = %00001000
 
 read_keyboard:                              ; Destroys a, x, y.
     ldx #$ff
@@ -44,35 +45,29 @@ check_control_bits:
     rts                                     ; clear the interrupt and return.
 
 read_scan_code:
+    lda kb_flags                            ; Since scan codes are entirely different for
+    and #EXTENDED_FLAG                      ; extended codes we checks that first.
+    bne read_extended_key
+
+;   ----------------------------------------------------------------
+;   1-scan code keys
+;   ----------------------------------------------------------------
     lda kb_flags
     and #RELEASE_FLAG
-    beq read_key
-
-    lda kb_flags                            ; The releseflag was set so we need reset
-    eor #RELEASE_FLAG                       ; it to handle the comming scan code correctly.
-    sta kb_flags
-
-    lda VIA2_PORTA                          ; Clear interrupt
-    cmp #$12
-    beq shift_released
-    cmp #$59
-    beq shift_released                      ; We don't care to record if "normal" keys
-    rts                                     ; where released.
-
-shift_released:
-    lda kb_flags
-    eor #SHIFT_FLAG
-    sta kb_flags
-    rts
+    bne key_released
 
 read_key:
     lda VIA2_PORTA
     cmp #$F0
     beq set_release_flag
+    cmp #$E0
+    beq set_extended_flag
     cmp #$12
     beq shift_pressed
     cmp #$59
     beq shift_pressed                       ; If it was neither shift or $f0 we read the key.
+    cmp #$14
+    beq ctrl_pressed
 
     tax
     lda kb_flags
@@ -89,9 +84,61 @@ store_key:
     inc kb_buff_write
     rts
 
+key_released:
+    lda kb_flags                            ; The releseflag was set so we need reset
+    eor #RELEASE_FLAG                       ; it to handle the comming scan code normally.
+    sta kb_flags
+
+    lda VIA2_PORTA                          ; Clear interrupt
+    cmp #$12
+    beq shift_released
+    cmp #$59
+    beq shift_released
+
+    cmp #$14
+    beq ctrl_released
+    cmp #$59
+    beq ctrl_released                        ; We don't care to record if "normal" keys
+    rts                                      ; where released.
 load_shifted_key:
     lda keymap_shifted, x
     jmp store_key
+
+;   ----------------------------------------------------------------
+;   Extended keys
+;   ----------------------------------------------------------------
+read_extended_key:
+    lda kb_flags
+    eor #EXTENDED_FLAG
+    sta kb_flags
+    lda kb_flags
+    and #RELEASE_FLAG
+    bne extended_key_released
+
+    lda VIA2_PORTA
+    cmp #$F0
+    beq set_release_flag
+    cmp #$14
+    beq ctrl_pressed
+
+    tax
+    lda keymap_extended, x
+    jmp store_key
+
+extended_key_released:
+    lda VIA2_PORTA                          ; Clear interrupt
+    cmp #$14
+    beq ctrl_released
+    rts
+
+;   ----------------------------------------------------------------
+;   Set and reset routines
+;   ----------------------------------------------------------------
+set_extended_flag:
+    lda kb_flags
+    ora #EXTENDED_FLAG
+    sta kb_flags
+    rts
 
 set_release_flag:
     lda kb_flags
@@ -107,9 +154,22 @@ shift_pressed:
 
 ctrl_pressed:
     lda kb_flags
-    ora #CTL_FLAG
+    ora #CTRL_FLAG
     sta kb_flags
     rts
+
+shift_released:
+    lda kb_flags
+    eor #SHIFT_FLAG
+    sta kb_flags
+    rts
+
+ctrl_released:
+    lda kb_flags
+    eor #CTRL_FLAG
+    sta kb_flags
+    rts
+
 
 ; Credit to Ben for these nice table
 keymap:
@@ -147,4 +207,15 @@ keymap_shifted:
   .byte "????????????????" ; D0-DF
   .byte "????????????????" ; E0-EF
   .byte "????????????????" ; F0-FF
+
+keymap_extended:
+  .byte "????????????????" ; 00-0F
+  .byte "???????????????+" ; 10-1F
+  .byte "???????+???????A" ; 20-2F              ; Apps
+  .byte "????????????????" ; 30-3F
+  .byte "??????????/?????" ; 40-4F
+  .byte "??????????", $0A, "?????" ; 50-5F      ; KP-Enter
+  .byte "?????????E?", $11, "H???" ; 60-6F      ; Left
+  .byte "I", $20, $12, "?", $14, $13, "????", $15, "??", $16, "??" ; 70-7F  ; Del, Down, right, up, Pg D/U
+  .byte "????????????????" ; 80-8F
 

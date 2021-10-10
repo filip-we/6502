@@ -48,8 +48,6 @@ reset_loop:
     inx
     bne reset_loop
 
-    sta pulse_counter
-
     ldx #32
 lcd_ram_init:
     dex
