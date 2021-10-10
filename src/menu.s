@@ -143,7 +143,7 @@ start_loop:
 start_clear_lcd:
     dex
     sta lcd_buff, x
-    cpx #0
+    cpx #$00
     bne start_clear_lcd
 
 main_loop:
@@ -158,7 +158,7 @@ main_loop:
     lda kb_buff, x
     inc kb_buff_read
 
-    cmp #$03
+    cmp #$05                ; F5 clears screen
     beq clear_lcd
 
 push_char_to_lcd:
@@ -174,14 +174,15 @@ push_char_to_lcd:
     jmp main_loop
 
 clear_lcd:
-    ldx #33
-    lda #$00
+    ldx #32
+    lda #' '
 clear_lcd_loop:
     dex
     sta lcd_buff, x
     cpx #$00
     bne clear_lcd_loop
 
+    lda #$00
     sta lcd_buff_write
     sta lcd_buff_read
     jsr update_lcd
