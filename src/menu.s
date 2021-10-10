@@ -158,10 +158,17 @@ main_loop:
     lda kb_buff, x
     inc kb_buff_read
 
-    cmp #$05                ; F5 clears screen
+    pha
+    cmp #$05                ; F5
     beq clear_lcd
+    cmp #$0A                ; Enter
+    beq main_loop
+    and #%11110000          ; Do not print scan-codes <$0F
+    cmp #$00
+    beq main_loop
 
 push_char_to_lcd:
+    pla
     ldx lcd_buff_write
     sta lcd_buff, x
     jsr update_lcd
