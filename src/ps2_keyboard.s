@@ -31,33 +31,33 @@ RELEASE_FLAG        = %00000001             ; Flags for keyboard status
 SHIFT_FLAG          = %00000010
 CTL_FLAG            = %00000010
 
-read_scan_code:                             ; Destroys a, x, y.
+read_keyboard:                              ; Destroys a, x, y.
     ldx #$ff
-read_scan_code_poll:
+check_control_bits:
     lda VIA2_PORTB                          ; We want to check the control-bits first.
-    and #PS2_CTL_MASK                  ;
-    cmp #PS2_CTL_CMP                        ;
-    beq read_scan_code_verified             ;
+    and #PS2_CTL_MASK
+    cmp #PS2_CTL_CMP
+    beq read_scan_code
     dex
-    bne read_scan_code_poll
-    lda VIA2_PORTA                          ; We have failed and need to clear the interrupt,
-    rts                                     ; and need to return.
+    bne check_control_bits
+    lda VIA2_PORTA                          ; The control-bits are not correct. We need to
+    rts                                     ; clear the interrupt and return.
 
-read_scan_code_verified:
+read_scan_code:
     lda kb_flags
     and #RELEASE_FLAG
     beq read_key
 
-    lda kb_flags                            ; If the releseflag was set we need to check
-    eor #RELEASE_FLAG                       ; if the modifiers where released.
+    lda kb_flags                            ; The releseflag was set so we need reset
+    eor #RELEASE_FLAG                       ; it to handle the comming scan code correctly.
     sta kb_flags
 
     lda VIA2_PORTA                          ; Clear interrupt
     cmp #$12
     beq shift_released
     cmp #$59
-    beq shift_released                      ; If neither of the shifts where released,
-    rts                                     ; we don't care.
+    beq shift_released                      ; We don't care to record if "normal" keys
+    rts                                     ; where released.
 
 shift_released:
     lda kb_flags

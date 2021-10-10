@@ -22,11 +22,11 @@ KB_POLL         = $0340
 
 .segment "DATA"
 kb_buff:        .res $100
-lcd_buff:       .res 16
+lcd_buff:       .res 32
 
 welcome_msg:
-    .byte "Hejsan!         "
-    .byte "0123456789abcdef", $00
+    .byte "== Iroko 0.3 == "
+    .byte "Hejsan!         ", $00
 
 char_map:
     .byte $00, "UDLR", $00
@@ -50,7 +50,7 @@ reset_loop:
 
     sta pulse_counter
 
-    ldx #33
+    ldx #32
 lcd_ram_init:
     dex
     lda welcome_msg, x
@@ -136,17 +136,17 @@ temp_main_2:
     jmp temp_main
 
 main:
-;start_loop:
-;    lda kb_buff_read        ; We want to keep the start message until user starts to type
-;    cmp kb_buff_write
-;    bpl start_loop
-;    ldx #33
-;    lda #' '
-;start_clear_lcd:
-;    dex
-;    sta lcd_buff, x
-;    cpx #0
-;    bne start_clear_lcd
+start_loop:
+    lda kb_buff_read        ; We want to keep the start message until user starts to type
+    cmp kb_buff_write
+    bpl start_loop
+    ldx #32
+    lda #' '
+start_clear_lcd:
+    dex
+    sta lcd_buff, x
+    cpx #0
+    bne start_clear_lcd
 
 main_loop:
     sei
@@ -169,7 +169,7 @@ push_char_to_lcd:
     jsr update_lcd
     inx
     stx lcd_buff_write
-    cpx #33
+    cpx #32
     bne main_loop
     lda #0
     sta lcd_buff_write
@@ -303,7 +303,7 @@ isr_VIA1_T1:
     jmp isr_ifr_check
 
 isr_VIA2_CA1:
-    jsr read_scan_code
+    jsr read_keyboard
     jmp isr_ifr_check
 
 nmi:
