@@ -3,6 +3,7 @@
 ;   ----------------------------------------------------------------
 .import __ZP_START__
 
+LCD_SIZE        = 32
 KB_POLL         = $0340
 
 ;   ----------------------------------------------------------------
@@ -138,7 +139,7 @@ start_loop:
     lda kb_buff_read        ; We want to keep the start message until user starts to type
     cmp kb_buff_write
     bpl start_loop
-    ldx #32
+    ldx #LCD_SIZE
     lda #' '
 start_clear_lcd:
     dex
@@ -161,11 +162,14 @@ main_loop:
     pha
     cmp #$05                ; F5
     beq clear_lcd
-    cmp #$0A                ; Enter
-    beq main_loop
-    and #%11110000          ; Do not print scan-codes <$0F
-    cmp #$00
-    beq main_loop
+    cmp #KC_LEFT
+    beq left_key
+    cmp #KC_RIGHT
+    beq right_key
+    cmp #KC_BSPC
+    beq bspc_key
+    cmp #KC_ENTER
+    beq enter_key
 
 push_char_to_lcd:
     pla
@@ -174,14 +178,58 @@ push_char_to_lcd:
     jsr update_lcd
     inx
     stx lcd_buff_write
-    cpx #32
+    cpx #LCD_SIZE
     bne main_loop
     lda #0
     sta lcd_buff_write
     jmp main_loop
 
+left_key:
+    dec lcd_buff_write
+    lda lcd_buff_write
+    cmp #$FF
+    bne main_loop
+    lda #(LCD_SIZE - 1)
+    sta lcd_buff_write
+    jmp main_loop
+
+right_key:
+    inc lcd_buff_write
+    lda lcd_buff_write
+    cmp #LCD_SIZE
+    bne main_loop
+    lda #$00
+    sta lcd_buff_write
+    jmp main_loop
+
+bspc_key:
+    dec lcd_buff_write
+    ldx lcd_buff_write
+    lda #' '
+    sta lcd_buff, x
+    jsr update_lcd
+    txa
+    cmp #$FF
+    bne main_loop
+    lda #(LCD_SIZE - 1)
+    sta lcd_buff_write
+    jmp main_loop
+
+enter_key:
+    ldx #LCD_SIZE
+    lda #' '
+enter_key_loop:
+    dex
+    sta lcd_buff, x
+    cpx #(LCD_SIZE/2)
+    bne enter_key_loop
+    jsr update_lcd
+    lda #$00
+    sta lcd_buff_write
+    jmp main_loop
+
 clear_lcd:
-    ldx #32
+    ldx #LCD_SIZE
     lda #' '
 clear_lcd_loop:
     dex
@@ -245,7 +293,7 @@ update_lcd_loop:
     inx
     cpx #16
     beq update_lcd_advance_line
-    cpx #32
+    cpx #LCD_SIZE
     bne update_lcd_loop
     pla
     tay
