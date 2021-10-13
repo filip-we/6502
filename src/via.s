@@ -1,21 +1,21 @@
     .import __STACK_START__
-    .import __VIA_START__
+    .import __VIA1_START__
 
-PORTB = __VIA_START__
-PORTA = __VIA_START__ + 1
-DDRB  = __VIA_START__ + 2
-DDRA  = __VIA_START__ + 3
+VIA1_PORTB = __VIA1_START__
+VIA1_PORTA = __VIA1_START__ + 1
+VIA1_DDRB  = __VIA1_START__ + 2
+VIA1_DDRA  = __VIA1_START__ + 3
 
-T1C_L = __VIA_START__ + $04      ; Timer 1 Counter Low byte
-T1C_H = __VIA_START__ + $05      ; Timer 1 Counter High byte
-T1L_L = __VIA_START__ + $06      ; Timer 1 Latch Low byte
-T1L_H = __VIA_START__ + $07      ; Timer 1 Latch High byte
+VIA1_T1C_L = __VIA1_START__ + $04      ; Timer 1 Counter Low byte
+VIA1_T1C_H = __VIA1_START__ + $05      ; Timer 1 Counter High byte
+VIA1_T1L_L = __VIA1_START__ + $06      ; Timer 1 Latch Low byte
+VIA1_T1L_H = __VIA1_START__ + $07      ; Timer 1 Latch High byte
 
-SR    = __VIA_START__ + $0A      ; Shift Register
-ACR   = __VIA_START__ + $0B      ; Auxiliary Control Register (T1 x2, T2 x2, Shift Register x3, Data Latch x2)
-PCR   = __VIA_START__ + $0C        ; Periferal Control Register
-IFR   = __VIA_START__ + $0D        ; Interrupt Flag Register
-IER   = __VIA_START__ + $0E        ; Interrupt Enable Register
+VIA1_SR    = __VIA1_START__ + $0A      ; Shift Register
+VIA1_ACR   = __VIA1_START__ + $0B      ; Auxiliary Control Register (T1 x2, T2 x2, Shift Register x3, Data Latch x2)
+VIA1_PCR   = __VIA1_START__ + $0C        ; Periferal Control Register
+VIA1_IFR   = __VIA1_START__ + $0D        ; Interrupt Flag Register
+VIA1_IER   = __VIA1_START__ + $0E        ; Interrupt Enable Register
 
 
 E =  %10000000
@@ -29,38 +29,38 @@ BUTTON_3_PIN = 5
 LCD_CLEAR_DISPLAY = %00000001
 LCD_CURSOR_HOME   = %00000010
 LCD_DISPLAY_ON    = %00001111
-LCD_SECOND_LINE   = $40
+LCD_SECOND_LINE   = %11000000
 
 ; ----------------------------------------------------------------
 lcd_command:
     jsr lcd_wait
-    sta PORTB
+    sta VIA1_PORTB
     lda #0
-    sta PORTA
+    sta VIA1_PORTA
     lda #E
-    sta PORTA
+    sta VIA1_PORTA
     lda #0
-    sta PORTA
+    sta VIA1_PORTA
     rts
 
 ; ----------------------------------------------------------------
 lcd_wait:
     pha
     lda #$00
-    sta DDRB
+    sta VIA1_DDRB
 lcd_wait_loop:
     lda #RW
-    sta PORTA
+    sta VIA1_PORTA
     lda #(RW | E)
-    sta PORTA
-    lda PORTB
+    sta VIA1_PORTA
+    lda VIA1_PORTB
     and #%10000000        ; Check BusyFlag bit. Will set the Z flag if the result is zero, ie lcd is not busy
     bne lcd_wait_loop
 
     lda #RW
-    sta PORTA
-    lda #$ff
-    sta DDRB
+    sta VIA1_PORTA
+    lda #$FF
+    sta VIA1_DDRB
     pla
     rts
 
@@ -87,14 +87,14 @@ lcd_print_hex_char:
 ; Non destructive
 lcd_print_char:
     jsr lcd_wait
-    sta PORTB
+    sta VIA1_PORTB
     pha
     lda #RS
-    sta PORTA
+    sta VIA1_PORTA
     lda #(RS | E) ; Sending instruction by toggling E bit
-    sta PORTA
+    sta VIA1_PORTA
     lda #RS
-    sta PORTA
+    sta VIA1_PORTA
     pla
     rts
 
@@ -103,10 +103,10 @@ lcd_print_char:
 ; Destroys a, y
 lcd_print_string:
     ldy #$00
-    lda (ADDR_A), y
+    lda (addr_a), y
 lcd_print_string_loop:
     jsr lcd_print_char
     iny
-    lda (ADDR_A), y
+    lda (addr_a), y
     bne lcd_print_string_loop   ; If a != $00 we continue
     rts
