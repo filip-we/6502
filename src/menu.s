@@ -279,6 +279,9 @@ button_return:
     rts
 
 update_lcd:                         ; Destructive on A
+; Keep track on where we want to start to print in lcd_buff_read. It thus is allways dividable with 16.
+; Update lcd_buff_read when (lcd_buff_write - lcd_buff_read > LCD_SIZE)
+; I think the comparison will work automatically if we check for equality (with every read key) and not larger than.
     txa
     pha
     tya
@@ -286,6 +289,15 @@ update_lcd:                         ; Destructive on A
     lda #LCD_CURSOR_HOME
     jsr lcd_command
 
+    sec
+    lda lcd_buff_write
+    sbc lcd_buff_read
+    cmp #LCD_SIZE
+    bne update_lcd_loop_start
+
+    lda lcd_buff_read
+    adc #LCD_SIZE
+update_lcd_loop_start:
     ldx #0
 update_lcd_loop:
     lda lcd_buff, x
