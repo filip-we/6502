@@ -6,7 +6,7 @@ ca65 --cpu 65C02 $1 -o bin/_segment.bin
 
 echo "\n>>> Linking <<<"
 cd ~/code/6502/bin
-ld65 _segment.bin -C ../src/memory_map.cfg -vm --mapfile ../etc/map_file.txt
+ld65 _segment.bin -C ../src/memory_map_for_sixty5o2.cfg -vm --mapfile ../etc/map_file.txt
 
 echo "\n>>> Sending file to Sixty5o2 <<<"
 cd ~/code/sixty5o2

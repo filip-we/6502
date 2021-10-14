@@ -12,19 +12,20 @@ KB_POLL         = $0340
 .segment "ZEROPAGE": zeropage
 .include "zeropage.s"
 
-.segment "VECTORS"
-.byte $0000
-.byte $0000
-.byte $0000
+.segment "BSS"
+kb_buff:        .res $100
+lcd_buff:       .res 32
 
-.segment "SIXTY5O2VECTORS"  ; Execution starts here, at $0200
+.segment "VECTORS"
+.word nmi
+.word start
+.word isr
+
+.segment "SIXTY5O2VECTORS"  ; Execution starts here ($200) when booting with Sixty5o2.
     jmp start               ; Jump to main code. Instrction is 3 bytes long.
     jmp nmi                 ; Instruction is 3 bytes long and thus starts at $0203.
 
 .segment "DATA"
-kb_buff:        .res $100
-lcd_buff:       .res 32
-
 welcome_msg:
     .byte "== Iroko 0.3 == "
     .byte "Hejsan!         ", $00
