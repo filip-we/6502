@@ -112,28 +112,6 @@ lcd_ram_init:
     cli                         ; Ready to receive interrupts
     jmp main
 
-temp_main:
-    ldx #64
-temp_main_1:
-    ldy #0
-temp_main_2:
-    dey
-    bne temp_main_2
-    dex
-    bne temp_main_1
-
-    lda #LCD_CLEAR_DISPLAY
-    jsr lcd_command
-    lda #LCD_CURSOR_HOME
-    jsr lcd_command
-
-    lda #'$'
-    jsr lcd_print_char
-    lda pulse_counter
-    jsr lcd_print_hex_byte
-
-    jmp temp_main
-
 main:
 start_loop:
     lda kb_buff_read        ; We want to keep the start message until user starts to type
@@ -282,6 +260,7 @@ update_lcd:                         ; Destructive on A
 ; Keep track on where we want to start to print in lcd_buff_read. It thus is allways dividable with 16.
 ; Update lcd_buff_read when (lcd_buff_write - lcd_buff_read > LCD_SIZE)
 ; I think the comparison will work automatically if we check for equality (with every read key) and not larger than.
+; If we recognize an Enter we print Spaces on the rest of the line and switch to the next line.
     txa
     pha
     tya
@@ -289,23 +268,22 @@ update_lcd:                         ; Destructive on A
     lda #LCD_CURSOR_HOME
     jsr lcd_command
 
-    sec
-    lda lcd_buff_write
-    sbc lcd_buff_read
-    cmp #LCD_SIZE
-    bne update_lcd_loop_start
-
+    clc
     lda lcd_buff_read
-    adc #LCD_SIZE
+    adc #LCD_SIZE / 2
+    sta lcd_buff_read_lcd_size_half
+    clc
+    adc #LCD_SIZE / 2
+    sta lcd_buff_read_lcd_size_full
 update_lcd_loop_start:
-    ldx #0
+    ldx lcd_buff_read
 update_lcd_loop:
     lda lcd_buff, x
     jsr lcd_print_char
     inx
-    cpx #16
+    cpx lcd_buff_read_lcd_size_half
     beq update_lcd_advance_line
-    cpx #LCD_SIZE
+    cpx lcd_buff_read_lcd_size_full
     bne update_lcd_loop
     pla
     tay
