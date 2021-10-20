@@ -112,6 +112,55 @@ lcd_ram_init:
     cli                         ; Ready to receive interrupts
     jmp main
 
+clear_lcd:
+    ldx #LCD_SIZE
+    lda #' '
+clear_lcd_loop:
+    dex
+    sta lcd_buff, x
+    cpx #$00
+    bne clear_lcd_loop
+
+    lda #$00
+    sta lcd_buff_write
+    sta lcd_buff_read
+    jsr update_lcd
+    jmp main_loop
+
+left_key:
+    dec lcd_buff_write
+    lda lcd_buff_write
+    cmp #$FF
+    bne main_loop
+    lda #(LCD_SIZE - 1)
+    sta lcd_buff_write
+    jmp main_loop
+
+right_key:
+    inc lcd_buff_write
+    lda lcd_buff_write
+    cmp #LCD_SIZE
+    bne main_loop
+    lda #$00
+    sta lcd_buff_write
+    jmp main_loop
+
+down_key:
+    lda lcd_buff_read
+    clc
+    adc #LCD_SIZE / 2
+    sta lcd_buff_read
+    jsr update_lcd
+    jmp main_loop
+
+up_key:
+    lda lcd_buff_read
+    sec
+    sbc #LCD_SIZE / 2
+    sta lcd_buff_read
+    jsr update_lcd
+    jmp main_loop
+
 main:
 start_loop:
     lda kb_buff_read        ; We want to keep the start message until user starts to type
@@ -144,6 +193,10 @@ main_loop:
     beq left_key
     cmp #KC_RIGHT
     beq right_key
+    cmp #KC_DOWN
+    beq down_key
+    cmp #KC_UP
+    beq up_key
     cmp #KC_BSPC
     beq bspc_key
     cmp #KC_ENTER
@@ -153,31 +206,23 @@ push_char_to_lcd:
     pla
     ldx lcd_buff_write
     sta lcd_buff, x
+
+    sec
+    lda lcd_buff_write
+    sbc lcd_buff_read
+    cmp #LCD_SIZE / 2
+    bmi push_char_to_lcd_ok
+
+    lda lcd_buff_write
+    and #%11110000
+    sec
+    sbc #16
+    sta lcd_buff_read
+
+push_char_to_lcd_ok:
     jsr update_lcd
     inx
     stx lcd_buff_write
-    cpx #LCD_SIZE
-    bne main_loop
-    lda #0
-    sta lcd_buff_write
-    jmp main_loop
-
-left_key:
-    dec lcd_buff_write
-    lda lcd_buff_write
-    cmp #$FF
-    bne main_loop
-    lda #(LCD_SIZE - 1)
-    sta lcd_buff_write
-    jmp main_loop
-
-right_key:
-    inc lcd_buff_write
-    lda lcd_buff_write
-    cmp #LCD_SIZE
-    bne main_loop
-    lda #$00
-    sta lcd_buff_write
     jmp main_loop
 
 bspc_key:
@@ -204,21 +249,6 @@ enter_key_loop:
     jsr update_lcd
     lda #$00
     sta lcd_buff_write
-    jmp main_loop
-
-clear_lcd:
-    ldx #LCD_SIZE
-    lda #' '
-clear_lcd_loop:
-    dex
-    sta lcd_buff, x
-    cpx #$00
-    bne clear_lcd_loop
-
-    lda #$00
-    sta lcd_buff_write
-    sta lcd_buff_read
-    jsr update_lcd
     jmp main_loop
 
 read_buttons:
