@@ -23,7 +23,7 @@ KB_POLL         = $0340
 
 .segment "DATA"
 kb_buff:        .res $100
-lcd_buff:       .res 32
+lcd_buff:       .res $100
 
 welcome_msg:
     .byte "== Iroko 0.3 == "
@@ -113,7 +113,7 @@ lcd_ram_init:
     jmp main
 
 clear_lcd:
-    ldx #LCD_SIZE
+    ldx #$FF
     lda #' '
 clear_lcd_loop:
     dex
@@ -166,13 +166,11 @@ start_loop:
     lda kb_buff_read        ; We want to keep the start message until user starts to type
     cmp kb_buff_write
     bpl start_loop
-    ldx #LCD_SIZE
-    lda #' '
 start_clear_lcd:
-    dex
-    sta lcd_buff, x
-    cpx #$00
-    bne start_clear_lcd
+    lda #LCD_SIZE
+    sta lcd_buff_write
+    lda #$00
+    sta lcd_buff_read
 
 main_loop:
     sei
