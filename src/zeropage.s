@@ -13,5 +13,7 @@ lcd_buff_read:          .res 1
 lcd_buff_read_lcd_size_half: .res 1
 lcd_buff_read_lcd_size_full: .res 1
 
+term_buff_write:         .res 1
+term_buff_read:          .res 1
 temp:                   .res 1
 

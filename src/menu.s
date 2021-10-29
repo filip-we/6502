@@ -23,6 +23,7 @@ KB_POLL         = $0340
 
 .segment "DATA"
 kb_buff:        .res $100
+term_buff:      .res $100
 lcd_buff:       .res $100
 
 welcome_msg:
@@ -43,6 +44,8 @@ start:
     sei                     ; Only needed since we get here from other code, not a hardware reset
 ; Reset variables
     lda #0
+    sta term_buff_read
+    sta term_buff_write
     ldx __ZP_START__
 reset_loop:
     sta $00, x
@@ -127,40 +130,6 @@ clear_lcd_loop:
     jsr update_lcd
     jmp main_loop
 
-left_key:
-    dec lcd_buff_write
-    lda lcd_buff_write
-    cmp #$FF
-    bne main_loop
-    lda #(LCD_SIZE - 1)
-    sta lcd_buff_write
-    jmp main_loop
-
-right_key:
-    inc lcd_buff_write
-    lda lcd_buff_write
-    cmp #LCD_SIZE
-    bne main_loop
-    lda #$00
-    sta lcd_buff_write
-    jmp main_loop
-
-down_key:
-    lda lcd_buff_read
-    clc
-    adc #LCD_SIZE / 2
-    sta lcd_buff_read
-    jsr update_lcd
-    jmp main_loop
-
-up_key:
-    lda lcd_buff_read
-    sec
-    sbc #LCD_SIZE / 2
-    sta lcd_buff_read
-    jsr update_lcd
-    jmp main_loop
-
 main:
 start_loop:
     lda kb_buff_read        ; We want to keep the start message until user starts to type
@@ -173,68 +142,61 @@ start_clear_lcd:
     sta lcd_buff_read
 
 main_loop:
-    sei
-    lda kb_buff_read
-    cmp kb_buff_write
-    cli
-    bpl main_loop
-    sei
-
-    ldx kb_buff_read
-    lda kb_buff, x
-    inc kb_buff_read
-
-    pha
-    cmp #$05                ; F5
-    beq clear_lcd
-    cmp #KC_LEFT
-    beq left_key
-    cmp #KC_RIGHT
-    beq right_key
-    cmp #KC_DOWN
-    beq down_key
-    cmp #KC_UP
-    beq up_key
-    cmp #KC_BSPC
-    beq bspc_key
-    cmp #KC_ENTER
-    beq enter_key
-
-push_char_to_lcd:
-    pla
-    ldx lcd_buff_write
-    sta lcd_buff, x
-
-    sec
-    lda lcd_buff_write
-    sbc lcd_buff_read
-    cmp #LCD_SIZE / 2
-    bmi push_char_to_lcd_ok
-
-    lda lcd_buff_write
-    and #%11110000
-    sec
-    sbc #16
-    sta lcd_buff_read
-
-push_char_to_lcd_ok:
-    jsr update_lcd
-    inx
-    stx lcd_buff_write
+    jsr parse_key
     jmp main_loop
 
-bspc_key:
-    dec lcd_buff_write
-    ldx lcd_buff_write
-    lda #' '
-    sta lcd_buff, x
-    jsr update_lcd
-    txa
-    cmp #$FF
-    bne main_loop
-    lda #(LCD_SIZE - 1)
-    sta lcd_buff_write
-    jmp main_loop
+.include "terminal.s"
+
+;main_loop:
+;    sei
+;    lda kb_buff_read
+;    cmp kb_buff_write
+;    cli
+;    bpl main_loop
+;    sei
+;
+;    ldx kb_buff_read
+;    lda kb_buff, x
+;    inc kb_buff_read
+;
+;    pha
+;    cmp #$05                ; F5
+;    beq clear_lcd
+;    cmp #KC_LEFT
+;    beq left_key
+;    cmp #KC_RIGHT
+;    beq right_key
+;    cmp #KC_DOWN
+;    beq down_key
+;    cmp #KC_UP
+;    beq up_key
+;    cmp #KC_BSPC
+;    beq bspc_key
+;    cmp #KC_ENTER
+;    beq enter_key
+;
+;push_char_to_lcd:
+;    pla
+;    ldx lcd_buff_write
+;    sta lcd_buff, x
+;
+;    sec
+;    lda lcd_buff_write
+;    sbc lcd_buff_read
+;    cmp #LCD_SIZE / 2
+;    bmi push_char_to_lcd_ok
+;
+;    lda lcd_buff_write
+;    and #%11110000
+;    sec
+;    sbc #16
+;    sta lcd_buff_read
+;
+;push_char_to_lcd_ok:
+;    jsr update_lcd
+;    inx
+;    stx lcd_buff_write
+;    jmp main_loop
 
 enter_key:
     ldx #LCD_SIZE
