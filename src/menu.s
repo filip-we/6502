@@ -4,7 +4,10 @@
 .import __ZP_START__
 
 LCD_SIZE        = 32
+LCD_WIDTH       = 16
+LCD_HIGHT       = 2
 KB_POLL         = $0340
+WELCOME_MSG_LEN = LCD_WIDTH * 2
 
 ;   ----------------------------------------------------------------
 ;   Zeropage, Startingvectors, Bufferts & Reset Vectors
@@ -39,18 +42,20 @@ char_map:
 .segment "CODE"
 .include "via.s"
 .include "ps2_keyboard.s"
+.include "terminal.s"
 
 start:
     sei                     ; Only needed since we get here from other code, not a hardware reset
 ; Reset variables
     lda #0
-    sta term_buff_read
-    sta term_buff_write
     ldx __ZP_START__
 reset_loop:
     sta $00, x
     inx
     bne reset_loop
+
+    lda #(WELCOME_MSG_LEN - 1)
+    sta lcd_buff_write
 
     ldx #32
 lcd_ram_init:
@@ -136,115 +141,17 @@ start_loop:
     cmp kb_buff_write
     bpl start_loop
 start_clear_lcd:
-    lda #LCD_SIZE
-    sta lcd_buff_write
-    lda #$00
+    ldx kb_buff_read        ; Convert first key-press to KC_ENTER will allow smoth start
+    lda #KC_ENTER           ; of the terminal.
+    sta kb_buff, x
+    clc
+    txa
+    adc #LCD_WIDTH
     sta lcd_buff_read
 
 main_loop:
     jsr parse_key
     jmp main_loop
-
-.include "terminal.s"
-
-;main_loop:
-;    sei
-;    lda kb_buff_read
-;    cmp kb_buff_write
-;    cli
-;    bpl main_loop
-;    sei
-;
-;    ldx kb_buff_read
-;    lda kb_buff, x
-;    inc kb_buff_read
-;
-;    pha
-;    cmp #$05                ; F5
-;    beq clear_lcd
-;    cmp #KC_LEFT
-;    beq left_key
-;    cmp #KC_RIGHT
-;    beq right_key
-;    cmp #KC_DOWN
-;    beq down_key
-;    cmp #KC_UP
-;    beq up_key
-;    cmp #KC_BSPC
-;    beq bspc_key
-;    cmp #KC_ENTER
-;    beq enter_key
-;
-;push_char_to_lcd:
-;    pla
-;    ldx lcd_buff_write
-;    sta lcd_buff, x
-;
-;    sec
-;    lda lcd_buff_write
-;    sbc lcd_buff_read
-;    cmp #LCD_SIZE / 2
-;    bmi push_char_to_lcd_ok
-;
-;    lda lcd_buff_write
-;    and #%11110000
-;    sec
-;    sbc #16
-;    sta lcd_buff_read
-;
-;push_char_to_lcd_ok:
-;    jsr update_lcd
-;    inx
-;    stx lcd_buff_write
-;    jmp main_loop
-
-enter_key:
-    ldx #LCD_SIZE
-    lda #' '
-enter_key_loop:
-    dex
-    sta lcd_buff, x
-    cpx #(LCD_SIZE/2)
-    bne enter_key_loop
-    jsr update_lcd
-    lda #$00
-    sta lcd_buff_write
-    jmp main_loop
-
-read_buttons:
-    ldx #5
-    lda #%00100000                  ; Buttons are at PBA1-PBA4
-    sta button_pin_nr
-read_buttons_loop:
-    dex
-    lda button_pin_nr
-    clc
-    ror
-    sta button_pin_nr
-    txa
-    beq button_return
-
-    lda button_pin_nr
-    and VIA1_PORTA
-    beq button_not_pressed          ; We don't care if the button is not pressed
-
-    inc button_counters, x
-    lda button_counters, x
-    cmp #$20                        ; Count triggering threshold
-    bne read_buttons_loop
-
-    ldy kb_buff_write
-    lda char_map, x
-    sta kb_buff, y
-    inc kb_buff_write
-    jmp read_buttons_loop
-
-button_not_pressed:
-    lda #0                          ; We don't count how long the button is NOT pressed. Just reset the counter.
-    sta button_counters, x
-    jmp read_buttons_loop
-button_return:
-    rts
 
 update_lcd:                         ; Destructive on A
 ; Keep track on where we want to start to print in lcd_buff_read. It thus is allways dividable with 16.
@@ -332,7 +239,7 @@ return_isr:
     rti
 
 isr_VIA1_T1:
-    jsr read_buttons
+;    jsr read_buttons                    ; Disabling to save time when uploadnig code.
     lda VIA1_T1C_L                       ; Reset Interrupt-flag
     jmp isr_ifr_check
 
