@@ -56,6 +56,8 @@ reset_loop:
 
     lda #(WELCOME_MSG_LEN - 1)
     sta lcd_buff_write
+    sta lcd_buff_cmd_start
+    sta lcd_buff_cmd_end
 
     ldx #32
 lcd_ram_init:
@@ -126,9 +128,9 @@ lcd_ram_init:
     cli                         ; Ready to receive interrupts
 
 main:
-    lda #$00
-    sta kb_buff_read
-    sta kb_buff_write
+;    lda #$00
+;    sta kb_buff_read
+;    sta kb_buff_write
 start_loop:
     lda kb_buff_read        ; We want to keep the start message until user starts to type
     cmp kb_buff_write
@@ -138,19 +140,15 @@ start_clear_lcd:
     lda #KC_ENTER           ; of the terminal.
     sta kb_buff, x
     clc
-    lda lcd_buff_read
+    lda lcd_buff_display
     adc #LCD_WIDTH
-    sta lcd_buff_read
+    sta lcd_buff_display
 
 main_loop:
     jsr parse_key
     jmp main_loop
 
 update_lcd:                         ; Destructive on A
-; Keep track on where we want to start to print in lcd_buff_read. It thus is allways dividable with 16.
-; Update lcd_buff_read when (lcd_buff_write - lcd_buff_read > LCD_SIZE)
-; I think the comparison will work automatically if we check for equality (with every read key) and not larger than.
-; If we recognize an Enter we print Spaces on the rest of the line and switch to the next line.
     txa
     pha
     tya
@@ -159,21 +157,21 @@ update_lcd:                         ; Destructive on A
     jsr lcd_command
 
     clc
-    lda lcd_buff_read
+    lda lcd_buff_display
     adc #LCD_SIZE / 2
-    sta lcd_buff_read_lcd_size_half
+    sta lcd_buff_display_lcd_size_half
     clc
     adc #LCD_SIZE / 2
-    sta lcd_buff_read_lcd_size_full
+    sta lcd_buff_display_lcd_size_full
 update_lcd_loop_start:
-    ldx lcd_buff_read
+    ldx lcd_buff_display
 update_lcd_loop:
     lda lcd_buff, x
     jsr lcd_print_char
     inx
-    cpx lcd_buff_read_lcd_size_half
+    cpx lcd_buff_display_lcd_size_half
     beq update_lcd_advance_line
-    cpx lcd_buff_read_lcd_size_full
+    cpx lcd_buff_display_lcd_size_full
     bne update_lcd_loop
     pla
     tay
@@ -185,7 +183,6 @@ update_lcd_advance_line:
     lda #LCD_SECOND_LINE
     jsr lcd_command
     jmp update_lcd_loop
-
 
 temp_isr:
     pha

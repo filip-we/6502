@@ -9,13 +9,12 @@ kb_buff_read:           .res 1
 kb_flags:               .res 1
 
 lcd_buff_write:         .res 1
-lcd_buff_read:          .res 1
-lcd_buff_end:           .res 1
-lcd_buff_read_lcd_size_half: .res 1
-lcd_buff_read_lcd_size_full: .res 1
+lcd_buff_display:       .res 1
+lcd_buff_display_lcd_size_half: .res 1
+lcd_buff_display_lcd_size_full: .res 1
 
-term_buff_write:        .res 1
-term_buff_read:         .res 1
-term_buff_end:          .res 1
+lcd_buff_cmd_write:     .res 1
+lcd_buff_cmd_start:     .res 1
+lcd_buff_cmd_end:       .res 1
 temp:                   .res 1
 
