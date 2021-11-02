@@ -8,7 +8,7 @@ enter_key:
 ; print #' ' until lcd_buff_write is dividable with LCD_SIZE
     pla                         ; Better now than later.
     clc
-    lda lcd_buff_write
+    lda lcd_buff_end
     adc #(LCD_WIDTH * 2)
     and #%11110000              ; We want to clear the next row in the lcd-buffer.
     tax
@@ -16,7 +16,7 @@ enter_key:
 enter_key_loop:
     dex
     sta lcd_buff, x
-    cpx lcd_buff_write
+    cpx lcd_buff_end
     bne enter_key_loop
 
     txa
@@ -33,22 +33,40 @@ enter_key_loop:
 
     lda term_buff_write         ; Make the buffer cleared to recieve new input.
     sta term_buff_read
+    sta term_buff_end
 
     jmp update_viewing_window
 
-bspc_key:
+bspc_and_left_key:
     sec
     lda term_buff_write
     sbc term_buff_read          ; The user is not allowed to remove more than the current 
     beq parse_key_return        ; command prompt.
-
     dec lcd_buff_write
-    ldx lcd_buff_write
-    lda #' '
-    sta lcd_buff, x
-    jsr update_lcd
     dec term_buff_write
-    jmp parse_key_return
+    jsr update_lcd
+    pla
+    cmp #KC_LEFT
+    beq parse_key_return_direct
+
+; Move all chars after lcd_buff_write one step down.
+    ldx lcd_buff_write
+bspc_move_buff:
+    inx
+    lda lcd_buff, x
+    dex
+    sta lcd_buff, x
+    inx
+    cpx lcd_buff_end
+    bne bspc_move_buff
+
+    lda #' '
+    ldx lcd_buff_end
+    sta lcd_buff, x
+    dec lcd_buff_end            ; The buffer have decreased in length.
+    dec term_buff_end
+    jsr update_lcd
+    jmp parse_key_return_direct
 
 parse_key_return:
     pla
@@ -73,9 +91,9 @@ parse_key:
     cmp #KC_ENTER
     beq enter_key
     cmp #KC_BSPC                ; Check all keys which require special treatment in either
-    beq bspc_key                ; of term_buff, lcd_buff or both
+    beq bspc_and_left_key       ; of term_buff, lcd_buff or both
     cmp #KC_LEFT
-    beq left_key
+    beq bspc_and_left_key
     cmp #KC_RIGHT
     beq right_key
     cmp #KC_DOWN
@@ -92,6 +110,19 @@ parse_key:
     sta term_buff, y
     inc term_buff_write
 
+    lda lcd_buff_write
+    sec
+    cmp lcd_buff_end
+    bmi continue_parse_key
+    sta lcd_buff_end
+continue_parse_key:
+; if term_buff_write > term_buff_end
+; then update term_buff_end
+    lda term_buff_write
+    sec
+    cmp term_buff_end
+    bmi update_viewing_window
+    sta term_buff_end
 update_viewing_window:
     sec
     lda lcd_buff_write
@@ -100,13 +131,13 @@ update_viewing_window:
     bmi call_lcd_update         ; We span more than one row and need to scroll
 
     lda lcd_buff_write
-    ;and #(LCD_WIDTH ^ $FF)
-    and #%11110000
+    and #((LCD_WIDTH - 1) ^ $FF)
     sec
     sbc #(LCD_WIDTH - 0)
     sta lcd_buff_read
 
-    lda lcd_buff_write
+    ;lda lcd_buff_write
+    lda lcd_buff_end
     clc
     adc #LCD_WIDTH
     tax
@@ -114,7 +145,8 @@ update_viewing_window:
 clear_next_line:
     dex
     sta lcd_buff, x
-    cpx lcd_buff_write
+    ;cpx lcd_buff_write
+    cpx lcd_buff_end
     bne clear_next_line
 
 call_lcd_update:
@@ -135,15 +167,6 @@ up_key:
     sbc #LCD_WIDTH
     sta lcd_buff_read
     jsr update_lcd
-    jmp parse_key_return
-
-left_key:
-    dec lcd_buff_write
-;    lda lcd_buff_write
-;    cmp #$FF
-;    bne main_loop
-;    lda #(LCD_SIZE - 1)
-;    sta lcd_buff_write
     jmp parse_key_return
 
 right_key:

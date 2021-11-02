@@ -48,7 +48,7 @@ start:
     sei                     ; Only needed since we get here from other code, not a hardware reset
 ; Reset variables
     lda #0
-    ldx __ZP_START__
+    ldx #<__ZP_START__
 reset_loop:
     sta $00, x
     inx
@@ -105,47 +105,40 @@ lcd_ram_init:
     sta VIA2_PORTB
 
 ; LCD-display setup
-    lda #LCD_CLEAR_DISPLAY
-    jsr lcd_command
-    lda #LCD_CURSOR_HOME
-    jsr lcd_command
     lda #%00000110              ; Entry mode
     jsr lcd_command
     lda #%00111000              ; Set to 8 bit mode, 1 line display, standard font
     jsr lcd_command
     lda #LCD_DISPLAY_ON
     jsr lcd_command
+
+; Disabled since the terminal takes care of screen clearing when needed.
+;clear_lcd:
+;    ldx lcd_buff_write
+;    lda #' '
+;clear_lcd_loop:
+;    inx
+;    sta lcd_buff, x
+;    cpx #$FF
+;    bne clear_lcd_loop
     jsr update_lcd
 
     cli                         ; Ready to receive interrupts
-    jmp main
-
-clear_lcd:
-    ldx #$FF
-    lda #' '
-clear_lcd_loop:
-    dex
-    sta lcd_buff, x
-    cpx #$00
-    bne clear_lcd_loop
-
-    lda #$00
-    sta lcd_buff_write
-    sta lcd_buff_read
-    jsr update_lcd
-    jmp main_loop
 
 main:
+    lda #$00
+    sta kb_buff_read
+    sta kb_buff_write
 start_loop:
     lda kb_buff_read        ; We want to keep the start message until user starts to type
     cmp kb_buff_write
     bpl start_loop
 start_clear_lcd:
-    ldx kb_buff_read        ; Convert first key-press to KC_ENTER will allow smoth start
+    ldx kb_buff_read        ; Convert first key-press to KC_ENTER will allow smooth start
     lda #KC_ENTER           ; of the terminal.
     sta kb_buff, x
     clc
-    txa
+    lda lcd_buff_read
     adc #LCD_WIDTH
     sta lcd_buff_read
 
