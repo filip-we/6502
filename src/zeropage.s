@@ -9,6 +9,7 @@ kb_buff_read:           .res 1
 kb_flags:               .res 1
 
 lcd_buff_write:         .res 1
+lcd_buff_start:         .res 1          ; Keeps track on where the first charactrs are.
 lcd_buff_display:       .res 1
 lcd_buff_display_lcd_size_half: .res 1
 lcd_buff_display_lcd_size_full: .res 1

@@ -5,7 +5,7 @@
 
 LCD_SIZE        = 32
 LCD_WIDTH       = 16
-LCD_HIGHT       = 2
+LCD_HEIGHT       = 2
 KB_POLL         = $0340
 WELCOME_MSG_LEN = LCD_WIDTH * 2
 

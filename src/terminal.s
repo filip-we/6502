@@ -63,14 +63,6 @@ bspc_move_buff:
     jsr update_lcd
     jmp parse_key_return_direct
 
-right_key:
-    sec
-    lda lcd_buff_write
-    sbc lcd_buff_cmd_end
-    beq parse_key_return
-    inc lcd_buff_write
-    jmp parse_key_return
-
 parse_key_return:
     pla
     rts
@@ -103,11 +95,77 @@ parse_key:
     beq down_key
     cmp #KC_UP
     beq up_key
+    jmp normal_key
 
-; If lcd_buff_write <= lcd_buff_cmd_end we ought to shift the chars to the rigth.
-    lda lcd_buff_cmd_end
-    cmp lcd_buff_write
-    beq push_key
+right_key:
+    sec
+    lda lcd_buff_write
+    sbc lcd_buff_cmd_end
+    beq parse_key_return
+    inc lcd_buff_write
+    jmp parse_key_return
+
+down_key:
+;    lda lcd_buff_display        ; We only want to shift the display if we end up
+;    clc                         ; before the cursor.
+;    adc #(LCD_HEIGHT * LCD_WIDTH)
+;    cmp lcd_buff_write
+;    bpl down_key_stop
+
+    lda lcd_buff_display
+    clc
+    adc #LCD_WIDTH
+    sta lcd_buff_display
+down_key_stop:
+    jsr update_lcd
+    jmp parse_key_return
+
+up_key:
+;    lda lcd_buff_display        ; Scroll if lcd_buff_display - lcd_buff_start > LCD_WIDTH
+;    sec
+;    sbc lcd_buff_start
+;    cmp #LCD_WIDTH
+;    bmi up_key_stop
+
+    lda lcd_buff_display
+    sec
+    sbc #LCD_WIDTH
+    sta lcd_buff_display
+up_key_stop:
+    jsr update_lcd
+    jmp parse_key_return
+
+normal_key:
+    lda lcd_buff_write              ; If we are about to wrap around lcd_buff we need 
+    and #((LCD_WIDTH - 1) ^ $FF)    ; to increase the start pointer.
+    clc
+    adc #(LCD_HEIGHT * LCD_WIDTH)
+    sec
+    sbc lcd_buff_start
+    bmi focus_display
+
+    lda lcd_buff_start
+    clc
+    adc #LCD_WIDTH
+    sta lcd_buff_start
+
+focus_display:
+    lda lcd_buff_display        ; We want to show the part of the display where the user
+    sec                         ; is typing.
+    sbc lcd_buff_write
+    cmp #(LCD_HEIGHT * LCD_WIDTH)
+    bmi start_shift_chars
+
+    lda lcd_buff_write
+    and #((LCD_WIDTH - 1) ^ $FF)
+    sec
+    sbc #LCD_WIDTH
+    sta lcd_buff_display
+
+start_shift_chars:
+    lda lcd_buff_cmd_end        ; If the user is typing anywhere but the end of the buffer
+    cmp lcd_buff_write          ; we need to shift the characters after the cursor 
+    beq push_key                ; to the right.
 
     ldx lcd_buff_cmd_end
 shift_chars:
@@ -142,7 +200,7 @@ update_viewing_window:
     lda lcd_buff_write
     and #((LCD_WIDTH - 1) ^ $FF)
     sec
-    sbc #(LCD_WIDTH - 0)
+    sbc #LCD_WIDTH
     sta lcd_buff_display
 
     lda lcd_buff_cmd_end
@@ -159,20 +217,4 @@ clear_next_line:
 call_lcd_update:
     jsr update_lcd
     rts
-
-down_key:
-    lda lcd_buff_display
-    clc
-    adc #LCD_WIDTH
-    sta lcd_buff_display
-    jsr update_lcd
-    jmp parse_key_return
-
-up_key:
-    lda lcd_buff_display
-    sec
-    sbc #LCD_WIDTH
-    sta lcd_buff_display
-    jsr update_lcd
-    jmp parse_key_return
 
