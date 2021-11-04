@@ -73,9 +73,10 @@ parse_key_return_direct:
 parse_key:
     sei
     lda kb_buff_read
-    cmp kb_buff_write
+    sec
+    sbc kb_buff_write
     cli
-    bpl parse_key_return_direct
+    bcs parse_key_return_direct
     sei
 
     ldx kb_buff_read
@@ -106,11 +107,11 @@ right_key:
     jmp parse_key_return
 
 down_key:
-;    lda lcd_buff_display        ; We only want to shift the display if we end up
-;    clc                         ; before the cursor.
-;    adc #(LCD_HEIGHT * LCD_WIDTH)
-;    cmp lcd_buff_write
-;    bpl down_key_stop
+    lda lcd_buff_display        ; We only want to shift the display if we end up
+    clc                         ; before the cursor.
+    adc #(LCD_HEIGHT * LCD_WIDTH)
+    cmp lcd_buff_write
+    bcs down_key_stop
 
     lda lcd_buff_display
     clc
@@ -121,11 +122,11 @@ down_key_stop:
     jmp parse_key_return
 
 up_key:
-;    lda lcd_buff_display        ; Scroll if lcd_buff_display - lcd_buff_start > LCD_WIDTH
-;    sec
-;    sbc lcd_buff_start
-;    cmp #LCD_WIDTH
-;    bmi up_key_stop
+    lda lcd_buff_display        ; Skip scroll if lcd_buff_display - lcd_buff_start
+    sec                         ; < LCD_WIDTH
+    sbc lcd_buff_start
+    cmp #LCD_WIDTH
+    bcc up_key_stop
 
     lda lcd_buff_display
     sec
@@ -136,31 +137,25 @@ up_key_stop:
     jmp parse_key_return
 
 normal_key:
-    lda lcd_buff_write              ; If we are about to wrap around lcd_buff we need 
-    and #((LCD_WIDTH - 1) ^ $FF)    ; to increase the start pointer.
-    clc
-    adc #(LCD_HEIGHT * LCD_WIDTH)
+;    lda lcd_buff_write              ; If we are about to wrap around lcd_buff we need 
+;    and #((LCD_WIDTH - 1) ^ $FF)    ; to increase the start pointer.
+;    clc
+;    adc #(LCD_HEIGHT * LCD_WIDTH)
+;    sec
+;    sbc lcd_buff_start
+;    bcc focus_display
+
+    lda lcd_buff_start
     sec
-    sbc lcd_buff_start
-    bmi focus_display
+    sbc #((LCD_HEIGHT + 1) * LCD_WIDTH)
+    sec
+    cmp #lcd_buff_write
+    bcs start_shift_chars       ; Skip update if result >= lcd_buff_write
 
     lda lcd_buff_start
     clc
     adc #LCD_WIDTH
     sta lcd_buff_start
-
-focus_display:
-    lda lcd_buff_display        ; We want to show the part of the display where the user
-    sec                         ; is typing.
-    sbc lcd_buff_write
-    cmp #(LCD_HEIGHT * LCD_WIDTH)
-    bmi start_shift_chars
-
-    lda lcd_buff_write
-    and #((LCD_WIDTH - 1) ^ $FF)
-    sec
-    sbc #LCD_WIDTH
-    sta lcd_buff_display
 
 start_shift_chars:
     lda lcd_buff_cmd_end        ; If the user is typing anywhere but the end of the buffer
@@ -174,8 +169,9 @@ shift_chars:
     sta lcd_buff, x
     dex
     dex
+    sec
     cpx lcd_buff_write
-    bpl shift_chars
+    bcs shift_chars
     inc lcd_buff_cmd_end
 
 push_key:
@@ -187,7 +183,7 @@ push_key:
     lda lcd_buff_write          ; Update lcd_buff_cmd_key to cover all printed chars.
     sec
     cmp lcd_buff_cmd_end
-    bmi update_viewing_window
+    bcc update_viewing_window
 
     sta lcd_buff_cmd_end
 update_viewing_window:
@@ -195,7 +191,7 @@ update_viewing_window:
     lda lcd_buff_write
     sbc lcd_buff_display
     cmp #(LCD_WIDTH + 1)
-    bmi call_lcd_update         ; We span more than one row and need to scroll
+    bcc call_lcd_update         ; We span more than one row and need to scroll
 
     lda lcd_buff_write
     and #((LCD_WIDTH - 1) ^ $FF)

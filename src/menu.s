@@ -46,6 +46,7 @@ char_map:
 
 start:
     sei                     ; Only needed since we get here from other code, not a hardware reset
+    cld                     ; BCD-flag state is unknown on power-up.
 ; Reset variables
     lda #0
     ldx #<__ZP_START__
